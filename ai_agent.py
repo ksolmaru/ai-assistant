@@ -94,7 +94,7 @@ class AIAssistant:
         try:
             while True:
                 response = self.client.messages.create(
-                    model="claude-opus-4-6",
+                    model="claude-sonnet-4-6",
                     max_tokens=4096,
                     system=self._get_system_prompt(),
                     tools=TOOL_SCHEMAS,
