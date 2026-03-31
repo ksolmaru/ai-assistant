@@ -4,13 +4,17 @@
 <meta charset="UTF-8"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
 <title>AI 캘린더</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script>
   tailwind.config = {
     theme: {
       extend: {
+        screens: {
+          md: "640px",
+        },
         colors: {
           "primary":                  "#655882",
           "primary-dim":              "#594c76",
@@ -45,19 +49,23 @@
   }
 </script>
 <style>
-  * { font-family: 'Inter', 'Noto Sans KR', sans-serif; }
-  h1,h2,h3,.hl { font-family: 'Noto Sans KR', sans-serif; }
-  .material-symbols-outlined { font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; vertical-align:middle; line-height:1; }
-  .fill-icon { font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24; }
-  .dot { width:7px;height:7px;border-radius:50%;background:#655882;animation:dot-flash 1s infinite linear alternate; }
-  .dot:nth-child(2){animation-delay:.2s} .dot:nth-child(3){animation-delay:.4s}
+  *{font-family:'Inter','Noto Sans KR',sans-serif;}
+  h1,h2,h3,.hl{font-family:'Noto Sans KR',sans-serif;}
+  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle;line-height:1;}
+  .fill-icon{font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;}
+  .dot{width:7px;height:7px;border-radius:50%;background:#655882;animation:dot-flash 1s infinite linear alternate;}
+  .dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
   @keyframes dot-flash{0%{opacity:.2}100%{opacity:1}}
-  .prose ul{list-style:disc;padding-left:1.25rem} .prose ol{list-style:decimal;padding-left:1.25rem}
-  .prose strong{font-weight:700} .prose p{margin-bottom:.5rem}
-  .nav-active { color:#655882 !important; background:rgba(218,202,251,0.45) !important; }
-  .cal-day { cursor:pointer; transition:background .12s; }
-  .hide-scrollbar::-webkit-scrollbar { display:none; }
-  .hide-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+  .prose ul{list-style:disc;padding-left:1.25rem}.prose ol{list-style:decimal;padding-left:1.25rem}
+  .prose strong{font-weight:700}.prose p{margin-bottom:.5rem}
+  /* Desktop sidebar nav active */
+  .nav-active{color:#655882 !important;background:rgba(218,202,251,0.35) !important;font-weight:700;}
+  /* Mobile bottom nav active */
+  .mob-active{color:#655882 !important;background:rgba(218,202,251,0.45) !important;}
+  .cal-day{cursor:pointer;transition:background .12s;}
+  .cal-day:hover{background:#f2f3f7 !important;}
+  .hide-scrollbar::-webkit-scrollbar{display:none;}
+  .hide-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
   .cscroll::-webkit-scrollbar{width:4px;}
   .cscroll::-webkit-scrollbar-track{background:transparent;}
   .cscroll::-webkit-scrollbar-thumb{background:#dfe3e9;border-radius:10px;}
@@ -65,134 +73,249 @@
   .color-swatch:hover{transform:scale(1.15);}
   .color-swatch.selected{border-color:#655882;transform:scale(1.15);}
   @keyframes badge-pop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.3)}100%{transform:scale(1);opacity:1}}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes spin{to{transform:rotate(360deg);}}
   .spin{animation:spin 1s linear infinite;display:inline-block;}
+  .ai-halo{position:fixed;top:0;right:0;width:500px;height:500px;background:#dacafb;opacity:.08;filter:blur(120px);border-radius:9999px;pointer-events:none;z-index:-1;}
   @keyframes slide-up{from{transform:translateY(100%)}to{transform:translateY(0)}}
   .slide-up{animation:slide-up .28s cubic-bezier(.32,.72,0,1);}
+  /* Chat sidebar mobile full-screen overlay */
+  @media (max-width:767px){
+    #chat-sidebar.mobile-open{
+      display:flex !important;position:fixed;inset:0;z-index:45;
+      width:100%;padding-top:56px;padding-bottom:88px;border-left:none;
+    }
+  }
+  /* Chat sidebar collapse transition */
+  #chat-sidebar{transition:width .25s cubic-bezier(.32,.72,0,1);}
+  #chat-sidebar-tab{transition:opacity .2s;}
 </style>
 </head>
-<body class="bg-background text-on-surface antialiased" style="min-height:100dvh;">
 
-<!-- AI Halo -->
-<div class="fixed top-0 right-0 w-80 h-80 rounded-full pointer-events-none z-0" style="background:#dacafb;opacity:.07;filter:blur(90px);"></div>
+<!-- Desktop: h-screen overflow-hidden flex | Mobile: block scrollable -->
+<body class="bg-background text-on-surface antialiased md:h-screen md:overflow-hidden md:flex">
+<div class="ai-halo"></div>
 
-<!-- ══ TOP APP BAR ══════════════════════════════════════════════ -->
-<header class="fixed top-0 left-0 w-full z-50 bg-background/85 backdrop-blur-xl flex justify-between items-center px-5 h-14">
-  <h1 class="hl font-extrabold text-lg text-primary tracking-tight">AI 캘린더</h1>
-  <button onclick="openSettings()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-primary">
-    <span class="material-symbols-outlined text-[22px]">settings</span>
-  </button>
-</header>
-
-<!-- ══ MAIN ══════════════════════════════════════════════════════ -->
-<main class="pt-14 pb-28">
-
-  <!-- ── 오늘 뷰 ─────────────────────────────────────── -->
-  <div id="view-today" class="min-h-screen">
-    <div class="px-4 pt-6 pb-4">
-      <p class="text-primary font-bold text-xs tracking-widest uppercase mb-1" id="today-date-sub"></p>
-      <h2 class="hl text-2xl font-extrabold text-on-surface">오늘의 일정</h2>
-    </div>
-    <div id="today-content" class="px-4 pb-4">
-      <p class="text-on-surface-variant text-sm text-center py-12">로딩 중...</p>
-    </div>
+<!-- ══════════════ SIDEBAR (desktop only) ══════════════ -->
+<aside class="hidden md:flex w-[228px] flex-shrink-0 h-screen bg-surface-container-low flex-col p-5 gap-4 z-50">
+  <div class="px-2 pt-1">
+    <p class="text-lg hl font-bold text-primary leading-none">AI 캘린더</p>
   </div>
+  <div class="bg-primary-fixed/25 rounded-xl px-3 py-2.5">
+    <p id="sidebar-date" class="text-xs font-bold text-primary leading-snug"></p>
+  </div>
+  <nav class="flex flex-col gap-0.5">
+    <button onclick="switchTab('today')" id="desk-tab-today"
+      class="nav-active flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-on-surface/60 hover:bg-primary-fixed/20 transition-all text-sm text-left w-full">
+      <span class="material-symbols-outlined text-[20px]">today</span><span>오늘</span>
+    </button>
+    <button onclick="switchTab('week')" id="desk-tab-week"
+      class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-on-surface/60 hover:bg-primary-fixed/20 transition-all text-sm text-left w-full">
+      <span class="material-symbols-outlined text-[20px]">date_range</span><span>주간</span>
+    </button>
+    <button onclick="switchTab('month')" id="desk-tab-month"
+      class="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-on-surface/60 hover:bg-primary-fixed/20 transition-all text-sm text-left w-full">
+      <span class="material-symbols-outlined text-[20px]">calendar_month</span><span>월별</span>
+    </button>
+  </nav>
+  <div class="flex-1 overflow-hidden flex flex-col">
+    <div class="flex items-center justify-between mb-2 px-1">
+      <p class="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest">카테고리</p>
+      <button onclick="openCatModal(null)" class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-primary-fixed/30 transition-colors">
+        <span class="material-symbols-outlined text-[16px] text-primary">add</span>
+      </button>
+    </div>
+    <div id="cat-list" class="space-y-0.5 overflow-y-auto cscroll flex-1"></div>
+  </div>
+  <div class="border-t border-outline-variant/20 pt-3 space-y-0.5 flex-shrink-0">
+    <button onclick="quickSend('뭐 놓친 거 있어?')"
+      class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-error/70 hover:bg-error/5 transition-all text-sm w-full">
+      <span class="material-symbols-outlined text-[20px]">warning</span><span>놓친 일 확인</span>
+    </button>
+    <button onclick="refreshAll()"
+      class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-on-surface/40 hover:bg-surface-container transition-all text-sm w-full">
+      <span class="material-symbols-outlined text-[20px]">refresh</span><span>새로고침</span>
+    </button>
+  </div>
+</aside>
 
-  <!-- ── 주간 뷰 ─────────────────────────────────────── -->
-  <div id="view-week" class="min-h-screen hidden">
-    <div class="px-4 pt-6 pb-3 flex items-center justify-between">
-      <h2 class="hl text-2xl font-extrabold text-on-surface">주간</h2>
-      <div class="flex items-center gap-1.5">
-        <button onclick="prevWeek()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+<!-- ══════════════ MAIN WRAPPER ══════════════ -->
+<div class="flex-1 flex flex-col md:overflow-hidden">
+
+  <!-- MOBILE top bar (hidden on desktop) -->
+  <header class="md:hidden fixed top-0 left-0 w-full z-50 bg-background/85 backdrop-blur-xl flex justify-between items-center px-5 h-14 border-b border-outline-variant/10">
+    <h1 class="hl font-extrabold text-lg text-primary tracking-tight">AI 캘린더</h1>
+    <button onclick="openSettings()" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-primary">
+      <span class="material-symbols-outlined text-[22px]">settings</span>
+    </button>
+  </header>
+
+  <!-- DESKTOP top bar (hidden on mobile) -->
+  <header class="hidden md:flex h-14 flex-shrink-0 bg-surface/80 backdrop-blur-md border-b border-outline-variant/10 items-center justify-between px-6 z-40">
+    <div class="flex items-center gap-4">
+      <h1 id="header-title" class="hl font-bold text-lg text-on-surface">오늘</h1>
+      <div id="nav-controls" class="hidden items-center gap-2">
+        <button id="btn-prev" class="w-8 h-8 flex items-center justify-center rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
           <span class="material-symbols-outlined text-[18px]">chevron_left</span>
         </button>
-        <span id="week-nav-label" class="text-xs font-bold text-on-surface-variant min-w-[96px] text-center"></span>
-        <button onclick="nextWeek()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+        <span id="nav-label" class="text-sm font-semibold text-on-surface min-w-[140px] text-center"></span>
+        <button id="btn-next" class="w-8 h-8 flex items-center justify-center rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors">
           <span class="material-symbols-outlined text-[18px]">chevron_right</span>
         </button>
-        <button onclick="goToToday()" class="px-2.5 h-8 text-xs font-bold text-primary bg-primary-fixed/30 rounded-full hover:bg-primary-fixed/50 transition-colors">오늘</button>
-      </div>
-    </div>
-    <!-- 지난 할 일 -->
-    <div id="week-overdue" class="hidden mx-4 mb-3 bg-error/5 rounded-2xl p-3 border border-error/10">
-      <h3 class="text-xs font-bold text-error mb-2 flex items-center gap-1">
-        <span class="material-symbols-outlined text-[14px]">warning</span> 지난 할 일
-      </h3>
-      <div id="week-overdue-list" class="space-y-1.5"></div>
-    </div>
-    <!-- 요일 pill 스크롤 -->
-    <div class="px-4 mb-4">
-      <div id="week-day-pills" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1"></div>
-    </div>
-    <!-- 선택된 날 일정 -->
-    <div id="week-content" class="px-4 pb-4"></div>
-  </div>
-
-  <!-- ── 월별 뷰 ─────────────────────────────────────── -->
-  <div id="view-month" class="min-h-screen hidden">
-    <div class="px-4 pt-6 pb-3 flex items-end justify-between">
-      <div>
-        <p class="text-on-surface-variant font-bold text-xs tracking-widest uppercase mb-0.5">일정</p>
-        <h2 id="month-nav-label" class="hl text-2xl font-extrabold text-primary tracking-tight"></h2>
-      </div>
-      <div class="flex gap-1.5 mb-0.5">
-        <button onclick="prevMonth()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
-          <span class="material-symbols-outlined text-[18px]">chevron_left</span>
-        </button>
-        <button onclick="nextMonth()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
-          <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+        <button onclick="goToToday()" class="px-3 h-8 flex items-center gap-1 rounded-lg bg-primary-fixed/40 text-primary hover:bg-primary-fixed/60 transition-colors text-xs font-bold">
+          <span class="material-symbols-outlined text-[15px]">my_location</span>오늘
         </button>
       </div>
     </div>
-    <!-- 달력 컨테이너 -->
-    <div class="bg-surface-container-lowest mx-4 rounded-[24px] shadow-sm overflow-hidden">
-      <div class="grid grid-cols-7 border-b border-outline-variant/10">
-        <div class="text-center text-[10px] font-bold text-error/70 py-2.5">일</div>
-        <div class="text-center text-[10px] font-bold text-on-surface-variant/60 py-2.5">월</div>
-        <div class="text-center text-[10px] font-bold text-on-surface-variant/60 py-2.5">화</div>
-        <div class="text-center text-[10px] font-bold text-on-surface-variant/60 py-2.5">수</div>
-        <div class="text-center text-[10px] font-bold text-on-surface-variant/60 py-2.5">목</div>
-        <div class="text-center text-[10px] font-bold text-on-surface-variant/60 py-2.5">금</div>
-        <div class="text-center text-[10px] font-bold text-primary/70 py-2.5">토</div>
+    <div class="flex items-center gap-2">
+      <button id="export-btn" onclick="exportCalendar()" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high transition-all">
+        <span class="material-symbols-outlined text-[16px]">download</span><span>이미지 저장</span>
+      </button>
+      <button onclick="toggleChatSidebar()" id="chat-toggle-btn"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-outline-variant/30 text-primary hover:bg-primary-fixed/20 transition-all">
+        <span class="material-symbols-outlined text-[16px]">chat_bubble</span>
+        <span id="chat-toggle-label">채팅 접기</span>
+      </button>
+      <button onclick="openNewTask()" class="flex items-center gap-1.5 px-4 py-1.5 rounded-xl font-bold text-xs bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-lg shadow-primary/20 hover:scale-105 transition-transform">
+        <span class="material-symbols-outlined text-[16px]">add</span>일정 추가
+      </button>
+    </div>
+  </header>
+
+  <!-- ══ VIEW CONTAINER ══ -->
+  <!-- Desktop: relative + absolute children | Mobile: pt-14 pb-28 block flow -->
+  <div class="md:flex-1 md:overflow-hidden md:relative pt-14 md:pt-0 pb-28 md:pb-0">
+
+    <!-- ── 오늘 ── -->
+    <div id="view-today" class="md:absolute md:inset-0 md:overflow-y-auto cscroll md:p-6">
+      <div class="px-4 pt-5 pb-3 md:px-0 md:pt-0 md:pb-0 md:mb-6">
+        <h2 class="hl text-3xl font-bold text-on-surface tracking-tight mb-1">오늘의 일정</h2>
+        <p id="today-date-sub" class="text-on-surface-variant text-sm"></p>
       </div>
-      <div id="month-grid" class="p-1.5"></div>
+      <div id="today-content" class="px-4 pb-4 md:px-0 md:pb-0 md:max-w-2xl">
+        <p class="text-on-surface-variant text-center mt-12 text-sm">로딩 중...</p>
+      </div>
     </div>
-    <!-- 날짜 상세 -->
-    <div id="day-detail" class="hidden mx-4 mt-3 bg-surface-container-lowest rounded-[24px] p-4 shadow-sm">
-      <h3 id="day-detail-title" class="hl font-bold text-on-surface mb-3 text-sm"></h3>
-      <div id="day-detail-list" class="space-y-2"></div>
+
+    <!-- ── 주간 ── -->
+    <div id="view-week" class="hidden md:absolute md:inset-0 md:overflow-y-auto cscroll md:p-6">
+      <!-- Mobile header (hidden on desktop) -->
+      <div class="md:hidden px-4 pt-5 pb-3 flex items-center justify-between">
+        <h2 class="hl text-2xl font-extrabold text-on-surface">주간</h2>
+        <div class="flex items-center gap-1.5">
+          <button onclick="prevWeek()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+          </button>
+          <span id="week-nav-label" class="text-xs font-bold text-on-surface-variant min-w-[90px] text-center"></span>
+          <button onclick="nextWeek()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+          <button onclick="goToToday()" class="px-2.5 h-8 text-xs font-bold text-primary bg-primary-fixed/30 rounded-full">오늘</button>
+        </div>
+      </div>
+      <!-- Overdue (shared) -->
+      <div id="week-overdue" class="hidden mx-4 md:mx-0 mb-4 bg-error/5 rounded-2xl p-4 border border-error/10">
+        <h3 class="text-xs font-bold text-error mb-2 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[14px]">warning</span> 지난 할 일
+        </h3>
+        <div id="week-overdue-list" class="space-y-1.5"></div>
+      </div>
+      <!-- Mobile: day pills (hidden on desktop) -->
+      <div class="md:hidden px-4 mb-4">
+        <div id="week-day-pills" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1"></div>
+      </div>
+      <!-- Content (desktop: 7-col grid, mobile: selected day list) -->
+      <div id="week-content" class="px-4 pb-4 md:px-0 md:pb-0 md:max-w-5xl"></div>
     </div>
-    <div class="h-4"></div>
+
+    <!-- ── 월별 ── -->
+    <div id="view-month" class="hidden md:absolute md:inset-0 md:overflow-y-auto cscroll md:p-6">
+      <!-- Mobile header (hidden on desktop) -->
+      <div class="md:hidden px-4 pt-5 pb-3 flex items-end justify-between">
+        <div>
+          <p class="text-on-surface-variant font-bold text-xs tracking-widest uppercase mb-0.5">일정</p>
+          <h2 id="month-nav-label" class="hl text-2xl font-extrabold text-primary tracking-tight"></h2>
+        </div>
+        <div class="flex gap-1.5 mb-0.5">
+          <button onclick="prevMonth()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+          </button>
+          <button onclick="nextMonth()" class="w-9 h-9 flex items-center justify-center rounded-full bg-surface-container hover:bg-surface-container-high transition-colors">
+            <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+          </button>
+        </div>
+      </div>
+      <div id="month-grid" class="px-4 md:px-0 md:max-w-4xl"></div>
+      <div id="day-detail" class="hidden mt-4 mx-4 md:mx-0 md:max-w-4xl bg-surface-container-lowest rounded-2xl p-5 border border-outline-variant/15 shadow-sm">
+        <h3 id="day-detail-title" class="hl font-bold text-on-surface mb-3 text-sm"></h3>
+        <div id="day-detail-list" class="space-y-2"></div>
+      </div>
+      <div class="h-4"></div>
+    </div>
+
+
+  </div><!-- end view-container -->
+</div><!-- end main wrapper -->
+
+<!-- ══════════════ CHAT SIDEBAR (desktop right panel) ══════════════ -->
+<aside id="chat-sidebar" class="hidden md:flex flex-col flex-shrink-0 w-[340px] bg-surface/95 backdrop-blur-md border-l border-outline-variant/10 md:h-screen overflow-hidden">
+  <!-- Header -->
+  <div class="flex items-center justify-between px-4 border-b border-outline-variant/10 bg-primary-fixed/15 flex-shrink-0 h-14">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px] text-primary fill-icon">chat_bubble</span>
+      <span class="hl font-bold text-sm text-primary">AI 채팅</span>
+    </div>
+    <button onclick="toggleChatSidebar()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-primary-fixed/30 transition-colors" title="채팅 접기">
+      <span class="material-symbols-outlined text-[18px] text-on-surface-variant">chevron_right</span>
+    </button>
   </div>
-
-  <!-- ── 채팅 뷰 ─────────────────────────────────────── -->
-  <div id="view-chat" class="min-h-screen hidden">
-    <div class="px-4 pt-6 pb-3">
-      <h2 class="hl text-2xl font-extrabold text-on-surface">AI 채팅</h2>
-      <p class="text-xs text-on-surface-variant mt-0.5">자연어로 일정을 추가·수정·삭제하세요</p>
-    </div>
-    <!-- 빠른 질문 -->
-    <div class="px-4 mb-4 flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-      <button onclick="quickSend('오늘 할 일 뭐야?')" class="text-xs px-3 py-1.5 bg-primary-fixed/40 text-on-primary-fixed rounded-full font-medium whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform">오늘 일정</button>
-      <button onclick="quickSend('이번 주 마감인 일 알려줘')" class="text-xs px-3 py-1.5 bg-secondary-fixed/40 text-on-secondary-fixed rounded-full font-medium whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform">이번 주</button>
-      <button onclick="quickSend('완료된 일 빼고 전부 보여줘')" class="text-xs px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-full font-medium whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform">전체 목록</button>
-      <button onclick="quickSend('뭐 놓친 거 있어?')" class="text-xs px-3 py-1.5 bg-error/10 text-error rounded-full font-medium whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform">놓친 일</button>
-      <button onclick="clearHistory()" class="text-xs px-3 py-1.5 bg-surface-container text-on-surface-variant/50 rounded-full font-medium whitespace-nowrap flex-shrink-0 active:scale-95 transition-transform">초기화</button>
-    </div>
-    <!-- 메시지 목록 -->
-    <div id="messages" class="px-4 pb-40 space-y-3"></div>
+  <!-- Hint -->
+  <div class="bg-primary-fixed/20 border-b border-primary-fixed/30 px-4 py-2 flex-shrink-0">
+    <p class="text-xs text-primary font-medium flex items-center gap-1">
+      <span class="material-symbols-outlined text-[14px]">tips_and_updates</span>
+      자연어로 일정을 추가·수정·삭제하세요
+    </p>
   </div>
+  <!-- Quick chips -->
+  <div class="px-4 py-2 flex gap-2 overflow-x-auto hide-scrollbar flex-shrink-0 border-b border-outline-variant/10">
+    <button onclick="quickSend('오늘 할 일 뭐야?')" class="text-xs px-3 py-1.5 bg-primary-fixed/40 text-on-primary-fixed rounded-full font-medium whitespace-nowrap flex-shrink-0 hover:bg-primary-fixed/60 transition-colors">오늘 일정</button>
+    <button onclick="quickSend('이번 주 마감인 일 알려줘')" class="text-xs px-3 py-1.5 bg-secondary-fixed/40 text-on-secondary-fixed rounded-full font-medium whitespace-nowrap flex-shrink-0 hover:bg-secondary-fixed/60 transition-colors">이번 주</button>
+    <button onclick="quickSend('완료된 일 빼고 전부 보여줘')" class="text-xs px-3 py-1.5 bg-surface-container text-on-surface-variant rounded-full font-medium whitespace-nowrap flex-shrink-0 hover:bg-surface-container-high transition-colors">전체 목록</button>
+    <button onclick="quickSend('뭐 놓친 거 있어?')" class="text-xs px-3 py-1.5 bg-error/10 text-error rounded-full font-medium whitespace-nowrap flex-shrink-0 hover:bg-error/20 transition-colors">놓친 일</button>
+    <button onclick="clearHistory()" class="text-xs px-3 py-1.5 bg-surface-container text-on-surface-variant/50 rounded-full font-medium whitespace-nowrap flex-shrink-0 hover:text-error hover:bg-error/5 transition-colors ml-auto">초기화</button>
+  </div>
+  <!-- Messages -->
+  <div id="messages" class="flex-1 overflow-y-auto cscroll px-4 py-3 space-y-4"></div>
+  <!-- Input -->
+  <div class="bg-surface/90 backdrop-blur-md border-t border-outline-variant/10 p-3 flex-shrink-0">
+    <div class="relative">
+      <input id="desk-input" type="text"
+        placeholder="예: 다음 주 토요일 오후 2시 공연팀 리허설 있어"
+        class="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-2xl px-4 py-2.5 text-sm placeholder:text-on-surface-variant/40 pr-12 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"/>
+      <button id="desk-send-btn" onclick="sendMessage()"
+        class="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-lg hover:scale-105 active:scale-95 transition-all">
+        <span class="material-symbols-outlined text-[18px]" id="desk-send-icon">send</span>
+      </button>
+    </div>
+  </div>
+</aside>
 
-</main>
+<!-- Chat sidebar collapsed strip (desktop only) -->
+<div id="chat-sidebar-tab" class="hidden flex-col items-center justify-start pt-5 gap-2 w-10 flex-shrink-0 border-l border-outline-variant/10 bg-surface-container-low cursor-pointer hover:bg-primary-fixed/20 transition-colors md:h-screen" onclick="toggleChatSidebar()" title="AI 채팅 열기">
+  <span class="material-symbols-outlined text-[18px] text-primary fill-icon">chat_bubble</span>
+  <span class="text-[9px] font-bold text-primary tracking-wider mt-1" style="writing-mode:vertical-rl;transform:rotate(180deg)">AI 채팅</span>
+</div>
 
-<!-- ══ FAB ══════════════════════════════════════════════════════ -->
+<!-- ══════════════ MOBILE ONLY ══════════════ -->
+
+<!-- Mobile FAB -->
 <button id="fab-btn" onclick="openNewTask()"
-  class="fixed right-5 bottom-[88px] w-14 h-14 bg-gradient-to-br from-primary to-primary-dim text-on-primary rounded-2xl shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40">
+  class="md:hidden fixed right-5 bottom-[88px] w-14 h-14 bg-gradient-to-br from-primary to-primary-dim text-on-primary rounded-2xl shadow-xl flex items-center justify-center active:scale-90 transition-transform z-40">
   <span class="material-symbols-outlined text-[24px]" style="font-variation-settings:'wght' 600;">add</span>
 </button>
 
-<!-- ══ CHAT INPUT ════════════════════════════════════════════════ -->
-<div id="chat-input-area" class="fixed bottom-[88px] left-0 w-full px-4 z-40 hidden">
+<!-- Mobile Chat Input -->
+<div id="chat-input-area" class="md:hidden hidden fixed bottom-[88px] left-0 w-full px-4 z-40">
   <div class="bg-surface-container-lowest rounded-[24px] shadow-[0_8px_32px_rgba(46,51,56,0.08)] p-2 flex items-center gap-2 border border-outline-variant/10">
     <input id="input" type="text"
       placeholder="예: 내일 오전 10시 찬양팀 연습"
@@ -205,108 +328,96 @@
   </div>
 </div>
 
-<!-- ══ BOTTOM NAV ════════════════════════════════════════════════ -->
-<nav class="fixed bottom-0 left-0 w-full z-50 bg-white/80 backdrop-blur-xl border-t border-outline-variant/10 rounded-t-[28px] shadow-[0_-8px_32px_rgba(46,51,56,0.06)]">
-  <div class="flex justify-around items-center px-2 pt-2 pb-5">
-    <button id="tab-today" onclick="switchTab('today')"
-      class="nav-active flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-on-surface/40 active:scale-90">
-      <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">today</span>
-      <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">오늘</span>
-    </button>
-    <button id="tab-week" onclick="switchTab('week')"
-      class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-on-surface/40 active:scale-90">
-      <span class="material-symbols-outlined text-[22px]">date_range</span>
-      <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">주간</span>
-    </button>
-    <button id="tab-month" onclick="switchTab('month')"
-      class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-on-surface/40 active:scale-90">
-      <span class="material-symbols-outlined text-[22px]">calendar_month</span>
-      <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">월별</span>
-    </button>
-    <button id="tab-chat" onclick="switchTab('chat')"
-      class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-on-surface/40 active:scale-90">
-      <span class="material-symbols-outlined text-[22px]">chat_bubble</span>
-      <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">채팅</span>
-    </button>
-  </div>
+<!-- Mobile Bottom Nav -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-xl shadow-[0_-10px_40px_rgba(46,51,56,0.06)] rounded-t-[28px]">
+  <button id="tab-today" onclick="switchTab('today')" class="mob-active flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-slate-400 active:scale-90">
+    <span class="material-symbols-outlined text-[22px]" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24;">today</span>
+    <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">오늘</span>
+  </button>
+  <button id="tab-week" onclick="switchTab('week')" class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-slate-400 active:scale-90">
+    <span class="material-symbols-outlined text-[22px]">date_range</span>
+    <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">주간</span>
+  </button>
+  <button id="tab-month" onclick="switchTab('month')" class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-slate-400 active:scale-90">
+    <span class="material-symbols-outlined text-[22px]">calendar_month</span>
+    <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">월별</span>
+  </button>
+  <button id="tab-chat" onclick="switchTab('chat')" class="flex flex-col items-center justify-center rounded-2xl px-5 py-1.5 transition-all text-slate-400 active:scale-90">
+    <span class="material-symbols-outlined text-[22px]">chat_bubble</span>
+    <span class="text-[10px] font-bold tracking-wider uppercase mt-0.5">채팅</span>
+  </button>
 </nav>
 
-<!-- ══ TASK MODAL (bottom sheet) ════════════════════════════════ -->
+<!-- ══════════════ MODALS ══════════════ -->
+
+<!-- Task Modal: bottom-sheet on mobile, right-panel on desktop -->
 <div id="task-modal" class="fixed inset-0 z-[100] hidden">
-  <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="closeModal()"></div>
-  <div class="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-[32px] max-h-[92dvh] flex flex-col slide-up">
-    <div class="flex-shrink-0 flex justify-center pt-3 pb-1">
+  <div class="absolute inset-0 bg-on-surface/20 backdrop-blur-sm" onclick="closeModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 max-h-[92dvh] rounded-t-[32px]
+               md:max-h-none md:bottom-auto md:top-0 md:right-0 md:left-auto md:h-full md:w-[420px] md:rounded-none md:border-l md:border-outline-variant/10
+               bg-surface-container-lowest shadow-2xl flex flex-col slide-up md:[animation:none]">
+    <div class="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
       <div class="w-12 h-1 rounded-full bg-outline-variant/40"></div>
     </div>
-    <div class="flex items-center justify-between px-5 py-3 border-b border-outline-variant/10 flex-shrink-0">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/10 flex-shrink-0">
       <h2 id="modal-title-label" class="hl font-bold text-on-surface text-base">일정 상세</h2>
-      <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-surface-container transition-colors">
+      <button onclick="closeModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container transition-colors">
         <span class="material-symbols-outlined text-[18px] text-on-surface-variant">close</span>
       </button>
     </div>
-    <!-- 상태 -->
-    <div class="px-5 py-3 border-b border-outline-variant/10 flex-shrink-0">
+    <div class="px-6 py-3 border-b border-outline-variant/10 flex-shrink-0">
       <p class="text-[10px] font-bold text-on-surface-variant/50 uppercase tracking-widest mb-2">상태</p>
       <div class="flex gap-2">
         <button onclick="setModalStatus('todo')" id="status-todo"
           class="flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all border-outline-variant/20 text-on-surface-variant">
-          <span class="material-symbols-outlined text-[13px]">radio_button_unchecked</span> 할 일
+          <span class="material-symbols-outlined text-[14px]">radio_button_unchecked</span> 할 일
         </button>
         <button onclick="setModalStatus('in_progress')" id="status-in_progress"
           class="flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all border-outline-variant/20 text-on-surface-variant">
-          <span class="material-symbols-outlined text-[13px]">timelapse</span> 진행 중
+          <span class="material-symbols-outlined text-[14px]">timelapse</span> 진행 중
         </button>
         <button onclick="setModalStatus('done')" id="status-done"
           class="flex-1 py-2 rounded-xl text-xs font-bold border-2 transition-all border-outline-variant/20 text-on-surface-variant">
-          <span class="material-symbols-outlined text-[13px]">check_circle</span> 완료
+          <span class="material-symbols-outlined text-[14px]">check_circle</span> 완료
         </button>
       </div>
     </div>
-    <!-- 폼 -->
-    <div class="flex-1 overflow-y-auto cscroll px-5 py-4 space-y-4">
+    <div class="flex-1 overflow-y-auto cscroll px-6 py-5 space-y-4">
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">제목</label>
-        <input id="modal-field-title" type="text"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+        <input id="modal-field-title" type="text" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
       </div>
       <div class="grid grid-cols-2 gap-3">
         <div>
           <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">날짜</label>
-          <input id="modal-field-due_date" type="date"
-            class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+          <input id="modal-field-due_date" type="date" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
         </div>
         <div>
           <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">시간</label>
-          <input id="modal-field-due_time" type="time"
-            class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+          <input id="modal-field-due_time" type="time" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
         </div>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">카테고리</label>
-        <select id="modal-field-category"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+        <select id="modal-field-category" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
           <option value="">— 선택 안 함 —</option>
         </select>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">장소</label>
-        <input id="modal-field-location" type="text" placeholder="예: 본당, 2층 회의실"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+        <input id="modal-field-location" type="text" placeholder="예: 본당, 2층 회의실" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">인원</label>
-        <input id="modal-field-attendees" type="text" placeholder="예: 5명 (홍길동, 김철수)"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+        <input id="modal-field-attendees" type="text" placeholder="예: 5명 (홍길동, 김철수)" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">메모</label>
-        <textarea id="modal-field-description" rows="3" placeholder="추가 메모..."
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"></textarea>
+        <textarea id="modal-field-description" rows="3" placeholder="추가 메모..." class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"></textarea>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">우선순위</label>
-        <select id="modal-field-priority"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
+        <select id="modal-field-priority" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all">
           <option value="low">낮음</option>
           <option value="medium">보통</option>
           <option value="high">높음</option>
@@ -317,72 +428,32 @@
         <p id="modal-created-at" class="text-xs text-on-surface-variant/60"></p>
       </div>
     </div>
-    <div class="px-5 py-4 border-t border-outline-variant/10 flex gap-3 flex-shrink-0">
-      <button onclick="saveModal()"
-        class="flex-1 py-3 rounded-2xl font-bold text-sm bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-md active:scale-[.98] transition-all">
-        저장
-      </button>
-      <button onclick="deleteFromModal()" id="modal-delete-btn"
-        class="hidden px-5 py-3 rounded-2xl font-bold text-sm border-2 border-error/20 text-error hover:bg-error/5 transition-all">
-        삭제
-      </button>
+    <div class="px-6 py-4 border-t border-outline-variant/10 flex gap-3 flex-shrink-0">
+      <button onclick="saveModal()" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-md hover:scale-[1.02] active:scale-[.98] transition-all">저장</button>
+      <button onclick="deleteFromModal()" id="modal-delete-btn" class="hidden px-4 py-2.5 rounded-xl font-bold text-sm border-2 border-error/20 text-error hover:bg-error/5 transition-all">삭제</button>
     </div>
   </div>
 </div>
 
-<!-- ══ SETTINGS MODAL ════════════════════════════════════════════ -->
-<div id="settings-modal" class="fixed inset-0 z-[110] hidden">
-  <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="closeSettings()"></div>
-  <div class="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-[32px] max-h-[80dvh] flex flex-col slide-up">
-    <div class="flex-shrink-0 flex justify-center pt-3 pb-1">
+<!-- Category Modal: bottom-sheet on mobile, side-panel on desktop -->
+<div id="cat-modal" class="fixed inset-0 z-[110] hidden">
+  <div class="absolute inset-0 bg-on-surface/20 backdrop-blur-sm" onclick="closeCatModal()"></div>
+  <div class="absolute bottom-0 left-0 right-0 rounded-t-[32px]
+               md:bottom-auto md:top-0 md:left-[228px] md:right-auto md:h-full md:w-[320px] md:rounded-none md:border-r md:border-outline-variant/10
+               bg-surface-container-lowest shadow-2xl flex flex-col slide-up md:[animation:none]">
+    <div class="md:hidden flex justify-center pt-3 pb-1 flex-shrink-0">
       <div class="w-12 h-1 rounded-full bg-outline-variant/40"></div>
     </div>
-    <div class="flex items-center justify-between px-5 py-3 border-b border-outline-variant/10 flex-shrink-0">
-      <h2 class="hl font-bold text-on-surface text-base">설정</h2>
-      <button onclick="closeSettings()" class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-surface-container transition-colors">
-        <span class="material-symbols-outlined text-[18px] text-on-surface-variant">close</span>
-      </button>
-    </div>
-    <div class="flex-1 overflow-y-auto cscroll px-5 py-4">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-sm font-bold text-on-surface">카테고리 관리</p>
-        <button onclick="openCatModal(null)" class="flex items-center gap-1 text-xs font-bold text-primary px-3 py-1.5 bg-primary-fixed/30 rounded-full hover:bg-primary-fixed/50 transition-colors active:scale-95">
-          <span class="material-symbols-outlined text-[14px]">add</span>추가
-        </button>
-      </div>
-      <div id="cat-list" class="space-y-1 mb-6"></div>
-      <div class="border-t border-outline-variant/10 pt-4 space-y-1">
-        <button onclick="quickSend('뭐 놓친 거 있어?');closeSettings();"
-          class="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-error/70 hover:bg-error/5 transition-colors text-sm active:scale-[.98]">
-          <span class="material-symbols-outlined text-[20px]">warning</span>놓친 일 확인
-        </button>
-        <button onclick="refreshAll()"
-          class="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-on-surface/60 hover:bg-surface-container transition-colors text-sm active:scale-[.98]">
-          <span class="material-symbols-outlined text-[20px]">refresh</span>새로고침
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ CATEGORY MODAL ════════════════════════════════════════════ -->
-<div id="cat-modal" class="fixed inset-0 z-[120] hidden">
-  <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="closeCatModal()"></div>
-  <div class="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-[32px] max-h-[80dvh] flex flex-col slide-up">
-    <div class="flex-shrink-0 flex justify-center pt-3 pb-1">
-      <div class="w-12 h-1 rounded-full bg-outline-variant/40"></div>
-    </div>
-    <div class="flex items-center justify-between px-5 py-3 border-b border-outline-variant/10 flex-shrink-0">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10 flex-shrink-0">
       <h2 id="cat-modal-title" class="hl font-bold text-on-surface text-base">카테고리 추가</h2>
-      <button onclick="closeCatModal()" class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-surface-container transition-colors">
+      <button onclick="closeCatModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-container transition-colors">
         <span class="material-symbols-outlined text-[18px] text-on-surface-variant">close</span>
       </button>
     </div>
-    <div class="flex-1 overflow-y-auto cscroll px-5 py-4 space-y-5">
+    <div class="flex-1 overflow-y-auto cscroll px-5 py-5 space-y-5">
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-1.5">카테고리 이름</label>
-        <input id="cat-field-name" type="text" placeholder="예: 개인 공부"
-          class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
+        <input id="cat-field-name" type="text" placeholder="예: 개인 공부" class="w-full bg-surface-container-low border border-outline-variant/20 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"/>
       </div>
       <div>
         <label class="text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-widest block mb-2">색상 선택</label>
@@ -394,19 +465,46 @@
       </div>
     </div>
     <div class="px-5 py-4 border-t border-outline-variant/10 flex gap-3 flex-shrink-0">
-      <button onclick="saveCatModal()"
-        class="flex-1 py-3 rounded-2xl font-bold text-sm bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-md active:scale-[.98] transition-all">
-        저장
-      </button>
-      <button onclick="deleteCatFromModal()" id="cat-delete-btn"
-        class="hidden px-5 py-3 rounded-2xl font-bold text-sm border-2 border-error/20 text-error hover:bg-error/5 transition-all">
-        삭제
-      </button>
+      <button onclick="saveCatModal()" class="flex-1 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-br from-primary to-primary-dim text-on-primary shadow-md hover:scale-[1.02] transition-all">저장</button>
+      <button onclick="deleteCatFromModal()" id="cat-delete-btn" class="hidden px-4 py-2.5 rounded-xl font-bold text-sm border-2 border-error/20 text-error hover:bg-error/5 transition-all">삭제</button>
     </div>
   </div>
 </div>
 
-<!-- ══ JAVASCRIPT ════════════════════════════════════════════════ -->
+<!-- Settings Modal (mobile only) -->
+<div id="settings-modal" class="md:hidden fixed inset-0 z-[110] hidden">
+  <div class="absolute inset-0 bg-on-surface/30 backdrop-blur-sm" onclick="closeSettings()"></div>
+  <div class="absolute bottom-0 left-0 right-0 bg-surface-container-lowest rounded-t-[32px] max-h-[80dvh] flex flex-col slide-up">
+    <div class="flex justify-center pt-3 pb-1 flex-shrink-0">
+      <div class="w-12 h-1 rounded-full bg-outline-variant/40"></div>
+    </div>
+    <div class="flex items-center justify-between px-5 py-3 border-b border-outline-variant/10 flex-shrink-0">
+      <h2 class="hl font-bold text-on-surface text-base">설정</h2>
+      <button onclick="closeSettings()" class="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-surface-container transition-colors">
+        <span class="material-symbols-outlined text-[18px] text-on-surface-variant">close</span>
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto cscroll px-5 py-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-bold text-on-surface">카테고리 관리</p>
+        <button onclick="openCatModal(null)" class="flex items-center gap-1 text-xs font-bold text-primary px-3 py-1.5 bg-primary-fixed/30 rounded-full hover:bg-primary-fixed/50 transition-colors">
+          <span class="material-symbols-outlined text-[14px]">add</span>추가
+        </button>
+      </div>
+      <div id="cat-list-mobile" class="space-y-1 mb-6"></div>
+      <div class="border-t border-outline-variant/10 pt-4 space-y-1">
+        <button onclick="quickSend('뭐 놓친 거 있어?');closeSettings();" class="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-error/70 hover:bg-error/5 transition-colors text-sm">
+          <span class="material-symbols-outlined text-[20px]">warning</span>놓친 일 확인
+        </button>
+        <button onclick="refreshAll()" class="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-on-surface/60 hover:bg-surface-container transition-colors text-sm">
+          <span class="material-symbols-outlined text-[20px]">refresh</span>새로고침
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ JAVASCRIPT ══════════════ -->
 <script>
 // ── 카테고리 ──────────────────────────────────────────────────────
 const DEFAULT_CATS = [
@@ -416,16 +514,11 @@ const DEFAULT_CATS = [
   {id:4, name:'개인 약속',      bg:'#e6e8ed', text:'#2e3338', visible:true},
 ];
 const COLOR_PRESETS = [
-  {bg:'#ccbcec', text:'#3a2e55', label:'보라'},
-  {bg:'#bceddd', text:'#18473b', label:'청록'},
-  {bg:'#f0d8c8', text:'#514136', label:'살구'},
-  {bg:'#e6e8ed', text:'#2e3338', label:'회색'},
-  {bg:'#fef3c7', text:'#92400e', label:'노랑'},
-  {bg:'#bfdbfe', text:'#1e40af', label:'파랑'},
-  {bg:'#fce7f3', text:'#9d174d', label:'분홍'},
-  {bg:'#d1fae5', text:'#065f46', label:'초록'},
-  {bg:'#fee2e2', text:'#991b1b', label:'빨강'},
-  {bg:'#ede9fe', text:'#5b21b6', label:'인디고'},
+  {bg:'#ccbcec',text:'#3a2e55',label:'보라'},{bg:'#bceddd',text:'#18473b',label:'청록'},
+  {bg:'#f0d8c8',text:'#514136',label:'살구'},{bg:'#e6e8ed',text:'#2e3338',label:'회색'},
+  {bg:'#fef3c7',text:'#92400e',label:'노랑'},{bg:'#bfdbfe',text:'#1e40af',label:'파랑'},
+  {bg:'#fce7f3',text:'#9d174d',label:'분홍'},{bg:'#d1fae5',text:'#065f46',label:'초록'},
+  {bg:'#fee2e2',text:'#991b1b',label:'빨강'},{bg:'#ede9fe',text:'#5b21b6',label:'인디고'},
 ];
 let categories = [];
 let catEditId  = null;
@@ -439,236 +532,355 @@ function loadCategories() {
 function saveCategories() { localStorage.setItem('ai-categories', JSON.stringify(categories)); }
 
 function renderCatList() {
-  if (!categories.length) {
-    document.getElementById('cat-list').innerHTML =
-      '<p class="text-xs text-on-surface-variant/40 px-1 py-2">카테고리 없음</p>';
-    return;
-  }
-  document.getElementById('cat-list').innerHTML = categories.map(cat => `
-    <div class="flex items-center gap-2 py-1 px-1 rounded-xl hover:bg-primary-fixed/10 transition-colors group">
-      <button onclick="toggleCatVisible(${cat.id})" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-primary-fixed/30 transition-colors flex-shrink-0">
-        <span class="material-symbols-outlined text-[16px] ${cat.visible?'text-on-surface-variant':'text-on-surface-variant/25'}"
+  const html = categories.length ? categories.map(cat => `
+    <div class="flex items-center gap-1.5 group py-0.5 px-1 rounded-lg hover:bg-primary-fixed/10 transition-colors">
+      <button onclick="toggleCatVisible(${cat.id})" class="w-6 h-6 flex items-center justify-center flex-shrink-0 rounded-md hover:bg-primary-fixed/30 transition-colors">
+        <span class="material-symbols-outlined text-[15px] ${cat.visible?'text-on-surface-variant':'text-on-surface-variant/25'}"
           style="font-variation-settings:'FILL' ${cat.visible?1:0},'wght' 400,'GRAD' 0,'opsz' 24">
           ${cat.visible?'visibility':'visibility_off'}
         </span>
       </button>
-      <span class="w-3 h-3 rounded-full flex-shrink-0 ${cat.visible?'':'opacity-25'}" style="background:${cat.bg}"></span>
-      <span class="text-sm text-on-surface-variant flex-1 truncate ${cat.visible?'':'opacity-35 line-through'}">${escapeHtml(cat.name)}</span>
-      <button onclick="openCatModal(${cat.id})" class="w-7 h-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 hover:bg-primary-fixed/30 transition-all">
-        <span class="material-symbols-outlined text-[14px] text-on-surface-variant">edit</span>
+      <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${cat.visible?'':'opacity-25'}" style="background:${cat.bg}"></span>
+      <span class="text-xs text-on-surface-variant flex-1 truncate ${cat.visible?'':'opacity-35 line-through'}">${escapeHtml(cat.name)}</span>
+      <button onclick="openCatModal(${cat.id})" class="w-6 h-6 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 transition-all hover:bg-primary-fixed/30">
+        <span class="material-symbols-outlined text-[13px] text-on-surface-variant">edit</span>
       </button>
     </div>
-  `).join('');
+  `).join('') : '<p class="text-xs text-on-surface-variant/40 px-1 py-2">카테고리 없음</p>';
+
+  // Update both sidebar (desktop) and settings modal (mobile)
+  const desktopList = document.getElementById('cat-list');
+  const mobileList  = document.getElementById('cat-list-mobile');
+  if (desktopList) desktopList.innerHTML = html;
+  if (mobileList)  mobileList.innerHTML  = html;
+
   const sel = document.getElementById('modal-field-category');
   if (sel) {
     const cur = sel.value;
     sel.innerHTML = '<option value="">— 선택 안 함 —</option>' +
-      categories.map(c => `<option value="${escapeHtml(c.name)}" ${c.name===cur?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+      categories.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===cur?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
   }
 }
 
 function toggleCatVisible(id) {
-  const cat = categories.find(c => c.id === id);
+  const cat = categories.find(c=>c.id===id);
   if (!cat) return;
   cat.visible = !cat.visible;
-  saveCategories();
-  renderCatList();
-  renderCurrentView();
+  saveCategories(); renderCatList(); renderCurrentView();
 }
 
 function openCatModal(id) {
   catEditId = id;
-  document.getElementById('color-swatches').innerHTML = COLOR_PRESETS.map((p,i) =>
+  document.getElementById('color-swatches').innerHTML = COLOR_PRESETS.map((p,i)=>
     `<button type="button" class="color-swatch" data-idx="${i}" style="background:${p.bg}" title="${p.label}" onclick="selectCatColor(${i})"></button>`
   ).join('');
-  if (id === null) {
-    document.getElementById('cat-modal-title').textContent = '카테고리 추가';
+  if (id===null) {
+    document.getElementById('cat-modal-title').textContent='카테고리 추가';
     document.getElementById('cat-delete-btn').classList.add('hidden');
-    document.getElementById('cat-field-name').value = '';
+    document.getElementById('cat-field-name').value='';
     selectCatColor(0);
   } else {
-    const cat = categories.find(c => c.id === id);
+    const cat=categories.find(c=>c.id===id);
     if (!cat) return;
-    document.getElementById('cat-modal-title').textContent = '카테고리 편집';
+    document.getElementById('cat-modal-title').textContent='카테고리 편집';
     document.getElementById('cat-delete-btn').classList.remove('hidden');
-    document.getElementById('cat-field-name').value = cat.name;
-    const idx = COLOR_PRESETS.findIndex(p => p.bg === cat.bg);
-    selectCatColor(idx >= 0 ? idx : 0);
+    document.getElementById('cat-field-name').value=cat.name;
+    const idx=COLOR_PRESETS.findIndex(p=>p.bg===cat.bg);
+    selectCatColor(idx>=0?idx:0);
   }
   document.getElementById('cat-modal').classList.remove('hidden');
 }
-
 function selectCatColor(idx) {
-  catColorIdx = idx;
-  const preset = COLOR_PRESETS[idx];
-  document.querySelectorAll('.color-swatch').forEach((el,i) => el.classList.toggle('selected', i===idx));
-  const preview = document.getElementById('cat-preview');
-  preview.textContent = document.getElementById('cat-field-name').value || '카테고리';
-  preview.style.background = preset.bg;
-  preview.style.color      = preset.text;
+  catColorIdx=idx; const preset=COLOR_PRESETS[idx];
+  document.querySelectorAll('.color-swatch').forEach((el,i)=>el.classList.toggle('selected',i===idx));
+  const preview=document.getElementById('cat-preview');
+  preview.textContent=document.getElementById('cat-field-name').value||'카테고리';
+  preview.style.background=preset.bg; preview.style.color=preset.text;
 }
-
-function closeCatModal() { document.getElementById('cat-modal').classList.add('hidden'); }
-
-function saveCatModal() {
-  const name = document.getElementById('cat-field-name').value.trim();
-  if (!name) { alert('카테고리 이름을 입력해주세요.'); return; }
-  const preset = COLOR_PRESETS[catColorIdx];
-  if (catEditId === null) {
-    const newId = Math.max(0, ...categories.map(c => c.id)) + 1;
-    categories.push({id: newId, name, bg: preset.bg, text: preset.text, visible: true});
+function closeCatModal(){document.getElementById('cat-modal').classList.add('hidden');}
+function saveCatModal(){
+  const name=document.getElementById('cat-field-name').value.trim();
+  if (!name){alert('카테고리 이름을 입력해주세요.');return;}
+  const preset=COLOR_PRESETS[catColorIdx];
+  if (catEditId===null){
+    const newId=Math.max(0,...categories.map(c=>c.id))+1;
+    categories.push({id:newId,name,bg:preset.bg,text:preset.text,visible:true});
   } else {
-    const cat = categories.find(c => c.id === catEditId);
-    if (cat) { cat.name = name; cat.bg = preset.bg; cat.text = preset.text; }
+    const cat=categories.find(c=>c.id===catEditId);
+    if (cat){cat.name=name;cat.bg=preset.bg;cat.text=preset.text;}
   }
-  saveCategories(); renderCatList(); renderCurrentView(); closeCatModal();
+  saveCategories();renderCatList();renderCurrentView();closeCatModal();
+}
+function deleteCatFromModal(){
+  if (!confirm(`'${categories.find(c=>c.id===catEditId)?.name}' 카테고리를 삭제할까요?`))return;
+  categories=categories.filter(c=>c.id!==catEditId);
+  saveCategories();renderCatList();renderCurrentView();closeCatModal();
+}
+function getCatColors(n){if(!n)return{bg:'#e6e8ed',text:'#2e3338'};const c=categories.find(c=>c.name===n);return c?{bg:c.bg,text:c.text}:{bg:'#e6e8ed',text:'#2e3338'};}
+function isCatVisible(n){if(!n)return true;const c=categories.find(c=>c.name===n);return c?c.visible:true;}
+
+// ── 설정 (모바일 전용) ─────────────────────────────────────────────
+function openSettings(){document.getElementById('settings-modal').classList.remove('hidden');}
+function closeSettings(){document.getElementById('settings-modal').classList.add('hidden');}
+
+// ── 이미지 내보내기 ────────────────────────────────────────────────
+async function exportCalendar(){
+  const btn=document.getElementById('export-btn');
+  const origHtml=btn.innerHTML;
+  btn.innerHTML='<span class="material-symbols-outlined text-[16px] spin">progress_activity</span><span>처리 중...</span>';
+  btn.disabled=true;
+  try{
+    const label=document.getElementById('nav-label').textContent;
+    const F='"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",Arial,sans-serif';
+    const isWeek=activeTab==='week';
+    const wrapper=document.createElement('div');
+    wrapper.style.cssText=`position:absolute;left:-9999px;top:0;background:#f9f9fc;padding:32px;font-family:${F};`;
+    wrapper.innerHTML=
+      `<div style="margin-bottom:12px;">
+        <span style="font-size:22px;font-weight:800;color:#655882;font-family:${F};letter-spacing:-0.5px;">Calendar</span>
+        <span style="font-size:14px;font-weight:700;color:#2e3338;font-family:${F};margin-left:12px;">${label}</span>
+        <span style="font-size:11px;color:#aeb2b8;font-family:${F};margin-left:12px;">${new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})}</span>
+      </div>
+      <div style="margin-bottom:16px;">${categories.filter(c=>c.visible).map(c=>
+        `<span style="display:inline-block;margin-right:14px;font-size:12px;font-weight:600;color:#5b5f65;font-family:${F};">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c.bg};margin-right:4px;vertical-align:middle;"></span>${c.name}
+        </span>`).join('')}
+      </div>`+
+      (isWeek?buildWeekExportHtml(F):buildMonthExportHtml(F));
+    document.body.appendChild(wrapper);
+    const canvas=await html2canvas(wrapper,{scale:2,useCORS:false,allowTaint:true,backgroundColor:'#f9f9fc',logging:false});
+    document.body.removeChild(wrapper);
+    const link=document.createElement('a');
+    link.download=`calendar-${label||''}-${fmtDate(new Date())}.png`;
+    link.href=canvas.toDataURL('image/png');link.click();
+  }catch(e){alert('이미지 내보내기에 실패했습니다.');console.error(e);}
+  finally{btn.innerHTML=origHtml;btn.disabled=false;}
 }
 
-function deleteCatFromModal() {
-  if (!confirm(`'${categories.find(c=>c.id===catEditId)?.name}' 카테고리를 삭제할까요?`)) return;
-  categories = categories.filter(c => c.id !== catEditId);
-  saveCategories(); renderCatList(); renderCurrentView(); closeCatModal();
+function buildMonthExportHtml(F){
+  const firstDay=new Date(calYear,calMonth,1),totalDays=new Date(calYear,calMonth+1,0).getDate();
+  const startDow=firstDay.getDay(),W=120,H=100;
+  let html=`<table style="border-collapse:collapse;table-layout:fixed;width:${W*7}px;font-family:${F};"><tr>`;
+  ['일','월','화','수','목','금','토'].forEach((d,i)=>{
+    const c=i===0?'#a8364b':i===6?'#655882':'#5b5f65';
+    html+=`<th style="width:${W}px;padding:8px 4px;text-align:center;font-size:12px;font-weight:700;color:${c};background:#f2f3f7;border-bottom:2px solid #dfe3e9;font-family:${F};">${d}</th>`;
+  });
+  html+='</tr><tr>';let col=0;
+  for(let i=0;i<startDow;i++,col++)html+=`<td style="width:${W}px;height:${H}px;vertical-align:top;background:#fafafa;border:1px solid #eceef3;"></td>`;
+  for(let d=1;d<=totalDays;d++,col++){
+    if(col>0&&col%7===0)html+='</tr><tr>';
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===TODAY_STR,dow=(startDow+d-1)%7;
+    const dayT=filterVisible(tasksForDate(ds));
+    const bg=isToday?'rgba(218,202,251,0.3)':'#ffffff',border=isToday?'2px solid rgba(101,88,130,0.4)':'1px solid #eceef3';
+    const dc=dow===0?'#a8364b':dow===6?'#655882':'#2e3338';
+    html+=`<td style="width:${W}px;height:${H}px;vertical-align:top;background:${bg};border:${border};padding:5px 4px;font-family:${F};">`;
+    html+=isToday
+      ?`<div style="text-align:right;margin-bottom:3px;"><span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:#655882;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:20px;font-family:${F};">${d}</span></div>`
+      :`<div style="text-align:right;margin-bottom:3px;font-size:11px;font-weight:700;color:${dc};font-family:${F};">${d}</div>`;
+    dayT.slice(0,3).forEach(t=>{
+      const{bg:cb,text:ct}=getCatColors(t.category);const done=t.status==='done';
+      html+=`<div style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:8px;margin-bottom:2px;background:${cb};color:${ct};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:${done?.5:1};font-family:${F};">${t.title}</div>`;
+    });
+    if(dayT.length>3)html+=`<div style="font-size:9px;color:#aeb2b8;font-family:${F};">+${dayT.length-3}건</div>`;
+    html+='</td>';
+  }
+  const rem=col%7;if(rem>0)for(let i=rem;i<7;i++)html+=`<td style="width:${W}px;height:${H}px;vertical-align:top;background:#fafafa;border:1px solid #eceef3;"></td>`;
+  html+='</tr></table>';return html;
 }
 
-function getCatColors(catName) {
-  if (!catName) return {bg:'#e6e8ed', text:'#2e3338'};
-  const cat = categories.find(c => c.name === catName);
-  return cat ? {bg:cat.bg, text:cat.text} : {bg:'#e6e8ed', text:'#2e3338'};
+function buildWeekExportHtml(F){
+  const days=Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const DN=['월','화','수','목','금','토','일'],W=130;
+  let html=`<table style="border-collapse:collapse;table-layout:fixed;width:${W*7}px;font-family:${F};"><tr>`;
+  days.forEach((d,i)=>{
+    const ds=fmtDate(d),isToday=ds===TODAY_STR,isSun=i===6,isSat=i===5;
+    const tasks=filterVisible(tasksForDate(ds));
+    const hBg=isToday?'#655882':'#eceef3',hColor=isToday?'#fdf7ff':isSun?'#a8364b':isSat?'#655882':'#5b5f65';
+    html+=`<td style="width:${W}px;vertical-align:top;border:1px solid #dfe3e9;font-family:${F};">
+      <div style="text-align:center;background:${hBg};padding:8px 4px;">
+        <div style="font-size:10px;font-weight:700;color:${hColor};letter-spacing:1px;font-family:${F};">${DN[i]}</div>
+        <div style="font-size:18px;font-weight:700;color:${hColor};font-family:${F};">${d.getDate()}</div>
+      </div>
+      <div style="padding:6px;min-height:120px;">`;
+    if(!tasks.length){html+=`<div style="font-size:11px;color:#d0d4da;text-align:center;padding:12px 0;font-family:${F};">없음</div>`;}
+    else tasks.forEach(t=>{
+      const{bg:cb}=getCatColors(t.category);const done=t.status==='done';
+      html+=`<div style="padding:3px 0;font-family:${F};">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${cb};vertical-align:middle;margin-right:4px;"></span>
+        ${t.due_time?`<span style="font-size:10px;color:#655882;font-weight:600;font-family:${F};">${t.due_time.slice(0,5)} </span>`:''}
+        <span style="font-size:11px;color:#2e3338;font-family:${F};${done?'text-decoration:line-through;opacity:0.5;':''}">${t.title}</span>
+      </div>`;
+    });
+    html+=`</div></td>`;
+  });
+  html+='</tr></table>';return html;
 }
-function isCatVisible(catName) {
-  if (!catName) return true;
-  const cat = categories.find(c => c.name === catName);
-  return cat ? cat.visible : true;
-}
-
-// ── 설정 모달 ──────────────────────────────────────────────────────
-function openSettings()  { document.getElementById('settings-modal').classList.remove('hidden'); }
-function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
 
 // ── 전역 상태 ──────────────────────────────────────────────────────
-let allTasks      = [];
-const now         = new Date();
-const TODAY_STR   = fmtDate(now);
-let activeTab     = 'today';
-let weekStart     = getMonday(now);
+let allTasks     = [];
+const now        = new Date();
+const TODAY_STR  = fmtDate(now);
+let activeTab    = 'today';
+let weekStart    = getMonday(now);
 let selectedWeekDay = TODAY_STR;
-let calYear       = now.getFullYear();
-let calMonth      = now.getMonth();
-let selectedDay   = null;
-let modalTaskId   = null;
-let modalStatus   = 'todo';
+let calYear      = now.getFullYear();
+let calMonth     = now.getMonth();
+let selectedDay  = null;
+let modalTaskId  = null;
+let modalStatus  = 'todo';
+let chatSidebarOpen = localStorage.getItem('chat-sidebar-open') !== 'false';
+
+// Tailwind의 md 브레이크포인트(640px)와 JS 모바일 판별 기준을 동일하게 맞춥니다.
+function isMobile(){return !window.matchMedia('(min-width:640px)').matches;}
+
+// ── 채팅 사이드바 토글 ────────────────────────────────────────────
+function toggleChatSidebar(){
+  chatSidebarOpen = !chatSidebarOpen;
+  localStorage.setItem('chat-sidebar-open', chatSidebarOpen);
+  applyChatSidebarState();
+}
+function openChatSidebar(){
+  if(!chatSidebarOpen){chatSidebarOpen=true;localStorage.setItem('chat-sidebar-open',true);applyChatSidebarState();}
+}
+function applyChatSidebarState(){
+  const sidebar = document.getElementById('chat-sidebar');
+  const tab     = document.getElementById('chat-sidebar-tab');
+  const label   = document.getElementById('chat-toggle-label');
+  if(chatSidebarOpen){
+    sidebar.classList.remove('hidden'); sidebar.classList.add('flex');
+    tab.classList.remove('flex');       tab.classList.add('hidden');
+    if(label) label.textContent='채팅 접기';
+  } else {
+    sidebar.classList.add('hidden');    sidebar.classList.remove('flex');
+    tab.classList.remove('hidden');     tab.classList.add('flex');
+    if(label) label.textContent='채팅 열기';
+  }
+}
 
 // ── 초기화 ────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   categories = loadCategories();
-  document.getElementById('today-date-sub').textContent =
-    now.toLocaleDateString('ko-KR', {month:'long', day:'numeric', weekday:'long'});
+  const dateStr = now.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric',weekday:'long'});
+  const sidebarDate = document.getElementById('sidebar-date');
+  if (sidebarDate) sidebarDate.textContent = dateStr;
+  const todaySub = document.getElementById('today-date-sub');
+  if (todaySub) todaySub.textContent = dateStr;
 
-  document.getElementById('cat-field-name').addEventListener('input', () => {
-    const name = document.getElementById('cat-field-name').value || '카테고리';
-    document.getElementById('cat-preview').textContent = name;
+  document.getElementById('btn-prev').onclick = ()=>{if(activeTab==='week')prevWeek();else prevMonth();};
+  document.getElementById('btn-next').onclick = ()=>{if(activeTab==='week')nextWeek();else nextMonth();};
+
+  document.getElementById('cat-field-name').addEventListener('input',()=>{
+    const name=document.getElementById('cat-field-name').value||'카테고리';
+    document.getElementById('cat-preview').textContent=name;
   });
+
+  // 채팅 사이드바 초기 상태 적용 (데스크탑만)
+  if(!isMobile()) applyChatSidebarState();
 
   renderCatList();
   await refreshAll();
   loadGreeting();
 });
 
-async function refreshAll() {
-  try {
-    const res  = await fetch('/tasks');
-    const data = await res.json();
-    allTasks   = data.tasks || [];
-    renderToday();
-    renderWeek();
-    renderMonth();
-  } catch(e) {}
+async function refreshAll(){
+  try{
+    const res=await fetch('/tasks');
+    const data=await res.json();
+    allTasks=data.tasks||[];
+    renderToday();renderWeek();renderMonth();
+  }catch(e){}
 }
 
-function renderCurrentView() {
-  if      (activeTab==='today') renderToday();
-  else if (activeTab==='week')  renderWeek();
-  else if (activeTab==='month') renderMonth();
+function renderCurrentView(){
+  if(activeTab==='today')renderToday();
+  else if(activeTab==='week')renderWeek();
+  else if(activeTab==='month')renderMonth();
 }
 
 // ── 탭 전환 ───────────────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  ['today','week','month','chat'].forEach(t => {
-    document.getElementById('tab-'+t).classList.remove('nav-active');
+const TAB_TITLES={today:'오늘',week:'주간',month:'월별',chat:'AI 채팅'};
+
+function switchTab(tab){
+  activeTab=tab;
+  // Left sidebar (desktop) - today/week/month only
+  ['today','week','month'].forEach(t=>{
+    document.getElementById('desk-tab-'+t)?.classList.remove('nav-active');
+    document.getElementById('desk-tab-'+t)?.classList.add('text-on-surface/60');
   });
-  document.getElementById('tab-'+tab).classList.add('nav-active');
-
-  document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.add('hidden'));
-  document.getElementById('view-'+tab).classList.remove('hidden');
-
-  const chatInput = document.getElementById('chat-input-area');
-  const fab       = document.getElementById('fab-btn');
-  if (tab === 'chat') {
-    chatInput.classList.remove('hidden');
-    fab.classList.add('hidden');
-  } else {
-    chatInput.classList.add('hidden');
-    fab.classList.remove('hidden');
+  if(tab!=='chat'){
+    const deskBtn=document.getElementById('desk-tab-'+tab);
+    if(deskBtn){deskBtn.classList.add('nav-active');deskBtn.classList.remove('text-on-surface/60');}
+  }
+  // Bottom nav (mobile)
+  ['today','week','month','chat'].forEach(t=>document.getElementById('tab-'+t)?.classList.remove('mob-active'));
+  document.getElementById('tab-'+tab)?.classList.add('mob-active');
+  // Views (today/week/month only — chat is now right sidebar)
+  ['today','week','month'].forEach(id=>{
+    const v=document.getElementById('view-'+id);
+    if(v){v.classList.add('hidden');v.classList.remove('flex','flex-col');}
+  });
+  if(tab!=='chat'){
+    const av=document.getElementById('view-'+tab);
+    if(av)av.classList.remove('hidden');
+  }
+  // Desktop header
+  const headerTitle=document.getElementById('header-title');
+  if(headerTitle)headerTitle.textContent=TAB_TITLES[tab]||TAB_TITLES['today'];
+  const nc=document.getElementById('nav-controls'),exp=document.getElementById('export-btn');
+  if(tab==='week'||tab==='month'){
+    nc?.classList.remove('hidden');nc?.classList.add('flex');
+    exp?.classList.remove('hidden');exp?.classList.add('flex');
+  }else{
+    nc?.classList.add('hidden');nc?.classList.remove('flex');
+    exp?.classList.add('hidden');exp?.classList.remove('flex');
+  }
+  // Mobile: chat uses sidebar as full-screen overlay
+  const chatSb=document.getElementById('chat-sidebar');
+  const chatInput=document.getElementById('chat-input-area');
+  const fab=document.getElementById('fab-btn');
+  if(tab==='chat'){
+    chatSb?.classList.add('mobile-open');
+    chatInput?.classList.remove('hidden');
+    fab?.classList.add('hidden');
+  }else{
+    chatSb?.classList.remove('mobile-open');
+    chatInput?.classList.add('hidden');
+    fab?.classList.remove('hidden');
   }
 
   renderCurrentView();
-  if (tab !== 'chat') refreshAll();
+  if(tab!=='chat')refreshAll();
 }
 
 // ── 날짜 도우미 ───────────────────────────────────────────────────
-function fmtDate(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+function fmtDate(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
-function getMonday(d){
-  const r=new Date(d),day=r.getDay();
-  r.setDate(r.getDate()-(day===0?6:day-1));r.setHours(0,0,0,0);return r;
-}
+function getMonday(d){const r=new Date(d),day=r.getDay();r.setDate(r.getDate()-(day===0?6:day-1));r.setHours(0,0,0,0);return r;}
 function tasksForDate(ds){return allTasks.filter(t=>t.due_date===ds);}
-function escapeHtml(s){
-  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                .replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-}
+function escapeHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
 function filterVisible(tasks){return tasks.filter(t=>isCatVisible(t.category));}
-
-const STATUS_META = {
-  todo:        {label:'할 일',   bg:'#eceef3', text:'#5b5f65'},
-  in_progress: {label:'진행 중', bg:'#bceddd', text:'#18473b'},
-  done:        {label:'완료',    bg:'#dacafb', text:'#3a2e55'},
-};
-
-function isActuallyOverdue(task) {
-  if (!task.due_date || task.status === 'done') return false;
-  const n = new Date();
-  if (task.due_time) return new Date(task.due_date+'T'+task.due_time) < n;
-  return task.due_date < TODAY_STR;
+const STATUS_META={todo:{label:'할 일',bg:'#eceef3',text:'#5b5f65'},in_progress:{label:'진행 중',bg:'#bceddd',text:'#18473b'},done:{label:'완료',bg:'#dacafb',text:'#3a2e55'}};
+function isActuallyOverdue(task){
+  if(!task.due_date||task.status==='done')return false;
+  const n=new Date();
+  if(task.due_time)return new Date(task.due_date+'T'+task.due_time)<n;
+  return task.due_date<TODAY_STR;
 }
 
-// ── 태스크 카드 ───────────────────────────────────────────────────
-function taskCard(task) {
-  const isOverdue = isActuallyOverdue(task);
-  const isDone    = task.status === 'done';
-  const {bg,text} = getCatColors(task.category);
-  const sm        = STATUS_META[task.status] || STATUS_META.todo;
-  const catBadge  = task.category
-    ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${bg};color:${text}">${escapeHtml(task.category)}</span>` : '';
-  const statusBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${sm.bg};color:${sm.text}">${sm.label}</span>`;
-  const overdueBadge = isOverdue
-    ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/10 text-error">마감 지남</span>` : '';
-  const timeStr = task.due_time
-    ? `<span class="font-semibold" style="color:#655882">${task.due_time.slice(0,5)}</span> · ` : '';
-  const locStr = task.location
-    ? `<p class="text-xs text-on-surface-variant mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">location_on</span>${escapeHtml(task.location)}</p>` : '';
-  return `<div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/10
-               hover:shadow-md active:scale-[.99] transition-all cursor-pointer group ${isDone?'opacity-60':''}"
-               onclick="openTask(${task.id})">
+function taskCard(task){
+  const isOverdue=isActuallyOverdue(task),isDone=task.status==='done';
+  const{bg,text}=getCatColors(task.category),sm=STATUS_META[task.status]||STATUS_META.todo;
+  const catBadge=task.category?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${bg};color:${text}">${escapeHtml(task.category)}</span>`:'';
+  const statusBadge=`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${sm.bg};color:${sm.text}">${sm.label}</span>`;
+  const overdueBadge=isOverdue?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-error/10 text-error">마감 지남</span>`:'';
+  const timeStr=task.due_time?`<span class="font-semibold" style="color:#655882">${task.due_time.slice(0,5)}</span> · `:'';
+  const locStr=task.location?`<p class="text-xs text-on-surface-variant mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-[12px]">location_on</span>${escapeHtml(task.location)}</p>`:'';
+  return`<div class="bg-surface-container-lowest rounded-xl p-3.5 border border-outline-variant/10 hover:shadow-md hover:scale-[1.01] transition-all cursor-pointer group ${isDone?'opacity-60':''}" onclick="openTask(${task.id})">
     <div class="flex items-start justify-between gap-2">
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-1.5 flex-wrap mb-1.5">${catBadge}${statusBadge}${overdueBadge}</div>
-        <p class="text-sm font-medium text-on-surface leading-snug ${isDone?'line-through text-on-surface-variant':''}">
-          ${timeStr}${escapeHtml(task.title)}
-        </p>${locStr}
+        <p class="text-sm font-medium text-on-surface leading-snug ${isDone?'line-through text-on-surface-variant':''}">${timeStr}${escapeHtml(task.title)}</p>${locStr}
       </div>
       <span class="material-symbols-outlined text-on-surface-variant/20 group-hover:text-primary/40 transition-colors text-[16px] mt-0.5 flex-shrink-0">chevron_right</span>
     </div>
@@ -676,436 +888,314 @@ function taskCard(task) {
 }
 
 // ── 오늘 뷰 ───────────────────────────────────────────────────────
-function renderToday() {
-  const base    = filterVisible(allTasks);
-  const overdue = base.filter(t => isActuallyOverdue(t));
-  const todayT  = base.filter(t => t.due_date===TODAY_STR && !isActuallyOverdue(t))
-                      .sort((a,b)=>(a.due_time||'99:99').localeCompare(b.due_time||'99:99'));
-  const noDate  = base.filter(t => !t.due_date && t.status !== 'done');
-  const doneList= base.filter(t => t.status==='done' && t.due_date && t.due_date < TODAY_STR);
-
-  let html = '';
-
-  if (overdue.length) html += `
-    <div class="mb-4 bg-error/5 rounded-2xl p-4 border border-error/10">
-      <h3 class="text-xs font-bold text-error mb-3 flex items-center gap-1 uppercase tracking-wide">
-        <span class="material-symbols-outlined text-[14px]">warning</span> 지난 할 일 (${overdue.length})
-      </h3>
-      <div class="space-y-2">${overdue.map(taskCard).join('')}</div>
-    </div>`;
-
-  if (todayT.length) html += `
-    <div class="mb-4">
-      <h3 class="text-xs font-bold text-primary mb-3 flex items-center gap-1 uppercase tracking-wide">
-        <span class="material-symbols-outlined text-[14px]">today</span> 오늘 (${todayT.length})
-      </h3>
-      <div class="space-y-2">${todayT.map(taskCard).join('')}</div>
-    </div>`;
-
-  if (noDate.length) html += `
-    <div class="mb-4">
-      <h3 class="text-xs font-bold text-on-surface-variant mb-3 flex items-center gap-1 uppercase tracking-wide">
-        <span class="material-symbols-outlined text-[14px]">schedule</span> 날짜 미정 (${noDate.length})
-      </h3>
-      <div class="space-y-2">${noDate.map(taskCard).join('')}</div>
-    </div>`;
-
-  if (doneList.length) html += `
-    <div class="mb-4">
-      <h3 class="text-xs font-bold text-on-surface-variant/40 mb-3 flex items-center gap-1 uppercase tracking-wide">
-        <span class="material-symbols-outlined text-[14px]">check_circle</span> 완료 (${doneList.length})
-      </h3>
-      <div class="space-y-2">${doneList.map(taskCard).join('')}</div>
-    </div>`;
-
-  if (!overdue.length && !todayT.length && !noDate.length && !doneList.length) {
-    html += `<div class="text-center py-16">
-      <div class="w-16 h-16 bg-secondary-fixed/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <span class="material-symbols-outlined text-secondary text-[32px] fill-icon">check_circle</span>
-      </div>
-      <p class="hl font-bold text-on-surface text-lg">할 일이 없습니다!</p>
-      <p class="text-on-surface-variant text-sm mt-1">오늘도 수고하셨어요 :)</p>
-      <button onclick="openNewTask()" class="mt-4 text-sm text-primary font-bold flex items-center gap-1 mx-auto">
-        일정 추가하기 <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
-      </button></div>`;
-  }
-
-  document.getElementById('today-content').innerHTML = html;
+function renderToday(){
+  const base=filterVisible(allTasks);
+  const overdue=base.filter(t=>isActuallyOverdue(t));
+  const todayT=base.filter(t=>t.due_date===TODAY_STR&&!isActuallyOverdue(t)).sort((a,b)=>(a.due_time||'99:99').localeCompare(b.due_time||'99:99'));
+  const noDate=base.filter(t=>!t.due_date&&t.status!=='done');
+  const doneList=base.filter(t=>t.status==='done'&&t.due_date&&t.due_date<TODAY_STR);
+  let html='';
+  if(overdue.length)html+=`<div class="mb-5 bg-error/5 rounded-2xl p-4 border border-error/10"><h3 class="text-xs font-bold text-error mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">warning</span> 지난 할 일 (${overdue.length})</h3><div class="space-y-2">${overdue.map(taskCard).join('')}</div></div>`;
+  if(todayT.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-primary mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">today</span> 오늘 (${todayT.length})</h3><div class="space-y-2">${todayT.map(taskCard).join('')}</div></div>`;
+  if(noDate.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-on-surface-variant mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">schedule</span> 날짜 미정 (${noDate.length})</h3><div class="space-y-2">${noDate.map(taskCard).join('')}</div></div>`;
+  if(doneList.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-on-surface-variant/40 mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">check_circle</span> 완료된 일 (${doneList.length})</h3><div class="space-y-2">${doneList.map(taskCard).join('')}</div></div>`;
+  if(!overdue.length&&!todayT.length&&!noDate.length&&!doneList.length)
+    html+=`<div class="text-center py-16"><div class="w-16 h-16 bg-secondary-fixed/50 rounded-2xl flex items-center justify-center mx-auto mb-4"><span class="material-symbols-outlined text-secondary text-[32px] fill-icon">check_circle</span></div><p class="hl font-bold text-on-surface text-lg">할 일이 없습니다!</p><p class="text-on-surface-variant text-sm mt-1">오늘도 수고하셨어요 :)</p><button onclick="openNewTask()" class="mt-4 text-sm text-primary font-bold hover:underline flex items-center gap-1 mx-auto">일정 추가하기 <span class="material-symbols-outlined text-[14px]">arrow_forward</span></button></div>`;
+  document.getElementById('today-content').innerHTML=html;
 }
 
 // ── 주간 뷰 ───────────────────────────────────────────────────────
 function prevWeek(){weekStart=addDays(weekStart,-7);renderWeek();}
 function nextWeek(){weekStart=addDays(weekStart, 7);renderWeek();}
 
-function renderWeek() {
-  const days = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
-  const label = document.getElementById('week-nav-label');
-  if (label) label.textContent =
-    days[0].toLocaleDateString('ko-KR',{month:'short',day:'numeric'})+' – '+
-    days[6].toLocaleDateString('ko-KR',{month:'short',day:'numeric'});
+function renderWeek(){
+  const days=Array.from({length:7},(_,i)=>addDays(weekStart,i));
+  const labelText=days[0].toLocaleDateString('ko-KR',{month:'long',day:'numeric'})+' – '+days[6].toLocaleDateString('ko-KR',{month:'long',day:'numeric'});
+  const nl=document.getElementById('nav-label');if(nl)nl.textContent=labelText;
+  const wl=document.getElementById('week-nav-label');if(wl)wl.textContent=labelText;
 
-  // 지난 할 일
-  const overdue = filterVisible(allTasks).filter(t => isActuallyOverdue(t));
-  const od = document.getElementById('week-overdue');
-  if (overdue.length) {
+  const overdue=filterVisible(allTasks).filter(t=>isActuallyOverdue(t));
+  const od=document.getElementById('week-overdue');
+  if(overdue.length){
     od.classList.remove('hidden');
-    document.getElementById('week-overdue-list').innerHTML = overdue.map(t =>
-      `<div class="flex items-center gap-2 text-xs cursor-pointer hover:opacity-70" onclick="openTask(${t.id})">
-        <span class="text-error">•</span>
-        <span class="text-on-surface">${escapeHtml(t.title)}</span>
-        <span class="text-error/60 ml-auto">${t.due_date}</span>
-      </div>`).join('');
-  } else { od.classList.add('hidden'); }
+    document.getElementById('week-overdue-list').innerHTML=overdue.map(t=>`<div class="flex items-center gap-2 text-xs cursor-pointer hover:opacity-70" onclick="openTask(${t.id})"><span class="text-error">•</span><span class="text-on-surface">${escapeHtml(t.title)}</span><span class="text-error/60 ml-auto">${t.due_date}</span></div>`).join('');
+  }else od.classList.add('hidden');
 
-  // 선택된 날이 현재 주에 없으면 오늘로 설정
-  if (!days.some(d => fmtDate(d) === selectedWeekDay)) {
-    const todayInWeek = days.find(d => fmtDate(d) === TODAY_STR);
-    selectedWeekDay = fmtDate(todayInWeek || days[0]);
+  if(isMobile()){
+    // Day pills
+    if(!days.some(d=>fmtDate(d)===selectedWeekDay)){
+      const todayInWeek=days.find(d=>fmtDate(d)===TODAY_STR);
+      selectedWeekDay=fmtDate(todayInWeek||days[0]);
+    }
+    const DN=['월','화','수','목','금','토','일'];
+    document.getElementById('week-day-pills').innerHTML=days.map((d,i)=>{
+      const ds=fmtDate(d),isToday=ds===TODAY_STR,isSel=ds===selectedWeekDay;
+      const hasTasks=filterVisible(tasksForDate(ds)).length>0;
+      let cls='flex flex-col items-center min-w-[50px] py-2.5 px-2 rounded-2xl transition-all flex-shrink-0 ';
+      if(isSel)cls+='bg-primary text-on-primary shadow-md ';
+      else if(isToday)cls+='bg-primary-fixed/40 text-primary ';
+      else cls+='bg-surface-container-low text-on-surface-variant ';
+      return`<button onclick="selectWeekDay('${ds}')" class="${cls}">
+        <span class="text-[9px] font-bold uppercase tracking-widest">${DN[i]}</span>
+        <span class="text-base font-extrabold mt-0.5">${d.getDate()}</span>
+        <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasTasks?(isSel?'bg-on-primary/50':'bg-primary'):'opacity-0'}"></span>
+      </button>`;
+    }).join('');
+    renderWeekDayContent(selectedWeekDay);
+  }else{
+    // Desktop 7-col grid
+    const DN=['월','화','수','목','금','토','일'];
+    let html='<div class="grid grid-cols-7 gap-2">';
+    days.forEach((d,i)=>{
+      const ds=fmtDate(d),isToday=ds===TODAY_STR,tasks=filterVisible(tasksForDate(ds));
+      const isSun=i===6,isSat=i===5;
+      const hStyle=isToday?'background:#655882;color:#fdf7ff':isSun?'background:#eceef3;color:#a8364b':isSat?'background:#eceef3;color:#655882':'background:#eceef3;color:#5b5f65';
+      html+=`<div class="bg-surface-container-lowest border ${isToday?'border-[#ccbcec]':'border-outline-variant/10'} rounded-xl overflow-hidden">
+        <div class="text-center py-2" style="${hStyle}">
+          <div class="text-[10px] font-bold uppercase tracking-wider">${DN[i]}</div>
+          <div class="text-base font-bold">${d.getDate()}</div>
+        </div>
+        <div class="p-1.5 space-y-1 min-h-[90px]">`;
+      if(!tasks.length)html+=`<p class="text-[11px] text-on-surface-variant/30 text-center pt-3">없음</p>`;
+      else tasks.forEach(t=>{
+        const{bg}=getCatColors(t.category);const done=t.status==='done';
+        html+=`<div class="flex items-start gap-1.5 p-1 rounded-lg hover:bg-surface-container transition-colors cursor-pointer group ${done?'opacity-50':''}" onclick="openTask(${t.id})">
+          <span class="mt-1.5 w-2 h-2 rounded-full flex-shrink-0" style="background:${bg}"></span>
+          <span class="text-[11px] text-on-surface group-hover:text-primary leading-tight ${done?'line-through text-on-surface-variant':''}">
+            ${t.due_time?`<span class="text-primary font-semibold">${t.due_time.slice(0,5)}</span> `:''}${escapeHtml(t.title)}
+          </span>
+        </div>`;
+      });
+      html+='</div></div>';
+    });
+    html+='</div>';
+    document.getElementById('week-content').innerHTML=html;
   }
-
-  // 요일 pills
-  const DN = ['월','화','수','목','금','토','일'];
-  const pillsHtml = days.map((d,i) => {
-    const ds = fmtDate(d);
-    const isToday = ds === TODAY_STR;
-    const isSel   = ds === selectedWeekDay;
-    const hasTasks = filterVisible(tasksForDate(ds)).length > 0;
-    let cls = 'flex flex-col items-center min-w-[50px] py-2.5 px-2 rounded-2xl transition-all flex-shrink-0 ';
-    if (isSel)        cls += 'bg-primary text-on-primary shadow-md shadow-primary/20 ';
-    else if (isToday) cls += 'bg-primary-fixed/40 text-primary ';
-    else              cls += 'bg-surface-container-low text-on-surface-variant ';
-    return `<button onclick="selectWeekDay('${ds}')" class="${cls}">
-      <span class="text-[9px] font-bold uppercase tracking-widest">${DN[i]}</span>
-      <span class="text-base font-extrabold mt-0.5">${d.getDate()}</span>
-      <span class="w-1.5 h-1.5 rounded-full mt-1 ${hasTasks?(isSel?'bg-on-primary/50':'bg-primary'):'opacity-0 bg-transparent'}"></span>
-    </button>`;
-  }).join('');
-  document.getElementById('week-day-pills').innerHTML = pillsHtml;
-
-  renderWeekDayContent(selectedWeekDay);
 }
 
-function selectWeekDay(ds) { selectedWeekDay = ds; renderWeek(); }
-
-function renderWeekDayContent(ds) {
-  const tasks = filterVisible(tasksForDate(ds))
-    .sort((a,b)=>(a.due_time||'99:99').localeCompare(b.due_time||'99:99'));
-  const d = new Date(ds+'T12:00:00');
-  const dateLabel = d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
-  let html = `<h3 class="text-sm font-bold text-on-surface-variant mb-3">${dateLabel}</h3>`;
-  if (!tasks.length) {
-    html += `<div class="text-center py-12">
-      <p class="text-on-surface-variant/40 text-sm">이 날 일정이 없습니다</p>
-      <button onclick="openNewTask()" class="mt-3 text-sm text-primary font-bold">일정 추가하기</button>
-    </div>`;
-  } else {
-    html += `<div class="space-y-2">${tasks.map(taskCard).join('')}</div>`;
-  }
-  document.getElementById('week-content').innerHTML = html;
+function selectWeekDay(ds){selectedWeekDay=ds;renderWeek();}
+function renderWeekDayContent(ds){
+  const tasks=filterVisible(tasksForDate(ds)).sort((a,b)=>(a.due_time||'99:99').localeCompare(b.due_time||'99:99'));
+  const d=new Date(ds+'T12:00:00');
+  const dateLabel=d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'});
+  let html=`<h3 class="text-sm font-bold text-on-surface-variant mb-3">${dateLabel}</h3>`;
+  if(!tasks.length)html+=`<div class="text-center py-12"><p class="text-on-surface-variant/40 text-sm">이 날 일정이 없습니다</p><button onclick="openNewTask()" class="mt-3 text-sm text-primary font-bold">일정 추가하기</button></div>`;
+  else html+=`<div class="space-y-2">${tasks.map(taskCard).join('')}</div>`;
+  document.getElementById('week-content').innerHTML=html;
 }
 
 // ── 월별 뷰 ───────────────────────────────────────────────────────
 function prevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}selectedDay=null;document.getElementById('day-detail').classList.add('hidden');renderMonth();}
 function nextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}selectedDay=null;document.getElementById('day-detail').classList.add('hidden');renderMonth();}
 
-function renderMonth() {
+function renderMonth(){
   const M=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  const label = document.getElementById('month-nav-label');
-  if (label) label.textContent = `${calYear}년 ${M[calMonth]}`;
+  const labelText=`${calYear}년 ${M[calMonth]}`;
+  const nl=document.getElementById('nav-label');if(nl)nl.textContent=labelText;
+  const ml=document.getElementById('month-nav-label');if(ml)ml.textContent=labelText;
 
-  const firstDay  = new Date(calYear, calMonth, 1);
-  const totalDays = new Date(calYear, calMonth+1, 0).getDate();
-  const startDow  = firstDay.getDay();
-
-  let html = '<div class="grid grid-cols-7 gap-0.5">';
-  for (let i = 0; i < startDow; i++) html += '<div class="min-h-[54px]"></div>';
-
-  for (let d = 1; d <= totalDays; d++) {
-    const ds     = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday = ds === TODAY_STR;
-    const isSel   = ds === selectedDay;
-    const dow     = (startDow + d - 1) % 7;
-    const dayT    = filterVisible(tasksForDate(ds));
-    const bgStyle = isSel ? 'background:rgba(218,202,251,0.45)' : isToday ? 'background:rgba(218,202,251,0.18)' : '';
-    const brStyle = isSel ? 'border:1.5px solid rgba(101,88,130,0.5)' : isToday ? 'border:1px solid rgba(101,88,130,0.3)' : 'border:1px solid transparent';
-    const dc      = dow===0 ? '#a8364b' : dow===6 ? '#655882' : '#2e3338';
-
-    html += `<div class="cal-day rounded-xl p-1 min-h-[54px]" style="${bgStyle};${brStyle}" onclick="selectCalDay('${ds}')">
-      <div class="text-right mb-0.5">
-        ${isToday
-          ? `<span class="text-[11px] font-bold text-on-primary inline-flex items-center justify-center w-5 h-5 rounded-full" style="background:#655882">${d}</span>`
-          : `<span class="text-[11px] font-semibold" style="color:${dc}">${d}</span>`}
+  const firstDay=new Date(calYear,calMonth,1),totalDays=new Date(calYear,calMonth+1,0).getDate(),startDow=firstDay.getDay();
+  let html=`<div class="grid grid-cols-7 mb-2 bg-surface-container-lowest rounded-2xl overflow-hidden border border-outline-variant/10">`;
+  ['일','월','화','수','목','금','토'].forEach((d,i)=>{
+    const c=i===0?'text-error':i===6?'text-primary':'text-on-surface-variant';
+    html+=`<div class="text-center text-xs font-bold ${c} py-3">${d}</div>`;
+  });
+  html+='</div><div class="grid grid-cols-7 gap-1.5">';
+  for(let i=0;i<startDow;i++)html+='<div class="min-h-[80px]"></div>';
+  for(let d=1;d<=totalDays;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===TODAY_STR,isSel=ds===selectedDay,dow=(startDow+d-1)%7;
+    const dayT=filterVisible(tasksForDate(ds));
+    const bgStyle=isSel?'background:rgba(218,202,251,0.4)':isToday?'background:rgba(218,202,251,0.2)':'background:#ffffff';
+    const brStyle=isSel?'border:2px solid rgba(101,88,130,0.5)':isToday?'border:1px solid rgba(101,88,130,0.3)':'border:1px solid rgba(174,178,184,0.15)';
+    const dc=dow===0?'#a8364b':dow===6?'#655882':'#2e3338';
+    html+=`<div class="cal-day rounded-xl p-2 transition-all min-h-[80px]" style="${bgStyle};${brStyle}" onclick="selectCalDay('${ds}')">
+      <div class="text-right mb-1">
+        ${isToday?`<span class="text-xs font-bold text-on-primary inline-flex items-center justify-center w-6 h-6 rounded-full" style="background:#655882">${d}</span>`:`<span class="text-xs font-bold" style="color:${dc}">${d}</span>`}
       </div>`;
-    dayT.slice(0,2).forEach(t => {
-      const {bg,text} = getCatColors(t.category);
-      const done = t.status==='done';
-      html += `<div class="text-[9px] font-bold rounded-full px-1 py-0.5 truncate mb-0.5 leading-tight ${done?'opacity-50':''}"
-                    style="background:${bg};color:${text}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>`;
+    dayT.slice(0,2).forEach(t=>{
+      const{bg,text}=getCatColors(t.category);const done=t.status==='done';
+      html+=`<div class="text-[10px] font-bold rounded-full px-1.5 py-0.5 truncate mb-0.5 leading-tight ${done?'opacity-50':''}" style="background:${bg};color:${text}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>`;
     });
-    if (dayT.length > 2) html += `<div class="text-[9px] text-on-surface-variant/60">+${dayT.length-2}</div>`;
-    html += '</div>';
+    if(dayT.length>2)html+=`<div class="text-[10px] text-on-surface-variant/60 font-medium">+${dayT.length-2}건</div>`;
+    html+='</div>';
   }
-
-  const total = startDow + totalDays, tail = (7 - total%7) % 7;
-  for (let i = 0; i < tail; i++) html += '<div class="min-h-[54px]"></div>';
-  html += '</div>';
-  document.getElementById('month-grid').innerHTML = html;
+  const total=startDow+totalDays,tail=(7-total%7)%7;
+  for(let i=0;i<tail;i++)html+='<div class="min-h-[80px]"></div>';
+  html+='</div>';
+  document.getElementById('month-grid').innerHTML=html;
 }
 
-function selectCalDay(ds) {
-  selectedDay = ds; renderMonth();
-  const tasks = filterVisible(tasksForDate(ds));
-  const detail = document.getElementById('day-detail');
-  const d = new Date(ds+'T12:00:00');
-  document.getElementById('day-detail-title').textContent =
-    d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'})+` — ${tasks.length}건`;
-  if (!tasks.length) {
-    document.getElementById('day-detail-list').innerHTML =
-      `<p class="text-sm text-on-surface-variant">할 일 없음</p>
-       <button onclick="openNewTask()" class="mt-2 text-sm text-primary font-bold flex items-center gap-1">
-         일정 추가하기 <span class="material-symbols-outlined text-[14px]">arrow_forward</span></button>`;
-  } else {
-    document.getElementById('day-detail-list').innerHTML = tasks.map(taskCard).join('');
-  }
+function selectCalDay(ds){
+  selectedDay=ds;renderMonth();
+  const tasks=filterVisible(tasksForDate(ds));
+  const detail=document.getElementById('day-detail');
+  const d=new Date(ds+'T12:00:00');
+  document.getElementById('day-detail-title').textContent=d.toLocaleDateString('ko-KR',{month:'long',day:'numeric',weekday:'long'})+` — ${tasks.length}건`;
+  document.getElementById('day-detail-list').innerHTML=tasks.length
+    ?tasks.map(taskCard).join('')
+    :`<p class="text-sm text-on-surface-variant">할 일 없음</p><button onclick="openNewTask()" class="mt-2 text-sm text-primary font-bold hover:underline flex items-center gap-1">일정 추가하기 <span class="material-symbols-outlined text-[14px]">arrow_forward</span></button>`;
   detail.classList.remove('hidden');
-  detail.scrollIntoView({behavior:'smooth', block:'nearest'});
+  detail.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function goToToday() {
-  if (activeTab === 'week') {
-    weekStart = getMonday(new Date());
-    selectedWeekDay = TODAY_STR;
-    renderWeek();
-  } else if (activeTab === 'month') {
-    calYear = now.getFullYear(); calMonth = now.getMonth();
-    selectedDay = TODAY_STR;
-    document.getElementById('day-detail').classList.add('hidden');
-    renderMonth();
-    setTimeout(() => selectCalDay(TODAY_STR), 50);
-  }
+function goToToday(){
+  if(activeTab==='week'){weekStart=getMonday(new Date());selectedWeekDay=TODAY_STR;renderWeek();}
+  else if(activeTab==='month'){calYear=now.getFullYear();calMonth=now.getMonth();selectedDay=TODAY_STR;document.getElementById('day-detail').classList.add('hidden');renderMonth();setTimeout(()=>selectCalDay(TODAY_STR),50);}
 }
 
 // ── 일정 모달 ─────────────────────────────────────────────────────
-function openNewTask() {
-  modalTaskId = null; modalStatus = 'todo';
-  document.getElementById('modal-title-label').textContent = '새 일정 추가';
+function openNewTask(){
+  modalTaskId=null;modalStatus='todo';
+  document.getElementById('modal-title-label').textContent='새 일정 추가';
   document.getElementById('modal-delete-btn').classList.add('hidden');
   document.getElementById('modal-created-area').classList.add('hidden');
-  document.getElementById('modal-field-title').value       = '';
-  document.getElementById('modal-field-due_date').value    = TODAY_STR;
-  document.getElementById('modal-field-due_time').value    = '';
-  document.getElementById('modal-field-location').value    = '';
-  document.getElementById('modal-field-attendees').value   = '';
-  document.getElementById('modal-field-description').value = '';
-  document.getElementById('modal-field-priority').value    = 'medium';
-  refreshCatSelect('');
-  renderModalStatus('todo');
+  document.getElementById('modal-field-title').value='';
+  document.getElementById('modal-field-due_date').value=TODAY_STR;
+  document.getElementById('modal-field-due_time').value='';
+  document.getElementById('modal-field-location').value='';
+  document.getElementById('modal-field-attendees').value='';
+  document.getElementById('modal-field-description').value='';
+  document.getElementById('modal-field-priority').value='medium';
+  refreshCatSelect('');renderModalStatus('todo');
   document.getElementById('task-modal').classList.remove('hidden');
 }
-
-async function openTask(id) {
-  try {
-    const res  = await fetch(`/tasks/${id}`);
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
-    const t = data.task;
-    modalTaskId = id; modalStatus = t.status || 'todo';
-    document.getElementById('modal-title-label').textContent = '일정 상세';
+async function openTask(id){
+  try{
+    const res=await fetch(`/tasks/${id}`);const data=await res.json();
+    if(data.error){alert(data.error);return;}
+    const t=data.task;modalTaskId=id;modalStatus=t.status||'todo';
+    document.getElementById('modal-title-label').textContent='일정 상세';
     document.getElementById('modal-delete-btn').classList.remove('hidden');
-    document.getElementById('modal-field-title').value       = t.title       || '';
-    document.getElementById('modal-field-due_date').value    = t.due_date    || '';
-    document.getElementById('modal-field-due_time').value    = t.due_time    || '';
-    document.getElementById('modal-field-location').value    = t.location    || '';
-    document.getElementById('modal-field-attendees').value   = t.attendees   || '';
-    document.getElementById('modal-field-description').value = t.description || '';
-    document.getElementById('modal-field-priority').value    = t.priority    || 'medium';
-    if (t.created_at) {
-      const cr = new Date(t.created_at);
+    document.getElementById('modal-field-title').value=t.title||'';
+    document.getElementById('modal-field-due_date').value=t.due_date||'';
+    document.getElementById('modal-field-due_time').value=t.due_time||'';
+    document.getElementById('modal-field-location').value=t.location||'';
+    document.getElementById('modal-field-attendees').value=t.attendees||'';
+    document.getElementById('modal-field-description').value=t.description||'';
+    document.getElementById('modal-field-priority').value=t.priority||'medium';
+    if(t.created_at){
+      const cr=new Date(t.created_at);
       document.getElementById('modal-created-area').classList.remove('hidden');
-      document.getElementById('modal-created-at').textContent =
-        cr.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})+' '+
-        cr.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
-    } else {
-      document.getElementById('modal-created-area').classList.add('hidden');
-    }
-    refreshCatSelect(t.category || '');
-    renderModalStatus(t.status || 'todo');
+      document.getElementById('modal-created-at').textContent=cr.toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'})+' '+cr.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    }else document.getElementById('modal-created-area').classList.add('hidden');
+    refreshCatSelect(t.category||'');renderModalStatus(t.status||'todo');
     document.getElementById('task-modal').classList.remove('hidden');
-  } catch(e) { alert('일정을 불러오지 못했습니다.'); }
+  }catch(e){alert('일정을 불러오지 못했습니다.');}
 }
-
-function refreshCatSelect(current) {
-  const sel = document.getElementById('modal-field-category');
-  sel.innerHTML = '<option value="">— 선택 안 함 —</option>' +
-    categories.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===current?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
+function refreshCatSelect(current){
+  const sel=document.getElementById('modal-field-category');
+  sel.innerHTML='<option value="">— 선택 안 함 —</option>'+categories.map(c=>`<option value="${escapeHtml(c.name)}" ${c.name===current?'selected':''}>${escapeHtml(c.name)}</option>`).join('');
 }
-
-function renderModalStatus(status) {
-  modalStatus = status;
-  const conf = {
-    todo:        {border:'border-primary/60',  bg:'rgba(218,202,251,0.35)', text:'#655882'},
-    in_progress: {border:'border-secondary/60',bg:'rgba(188,237,221,0.35)', text:'#3b675b'},
-    done:        {border:'border-secondary/60',bg:'rgba(188,237,221,0.35)', text:'#3b675b'},
-  };
-  ['todo','in_progress','done'].forEach(s => {
-    const btn = document.getElementById('status-'+s);
+function renderModalStatus(status){
+  modalStatus=status;
+  const conf={todo:{border:'border-primary/60',bg:'rgba(218,202,251,0.35)',text:'#655882'},in_progress:{border:'border-secondary/60',bg:'rgba(188,237,221,0.35)',text:'#3b675b'},done:{border:'border-secondary/60',bg:'rgba(188,237,221,0.35)',text:'#3b675b'}};
+  ['todo','in_progress','done'].forEach(s=>{
+    const btn=document.getElementById('status-'+s);
     btn.classList.remove('border-primary/60','border-secondary/60','border-outline-variant/20');
-    btn.style.background = ''; btn.style.color = '';
-    if (s === status) {
-      btn.classList.add(conf[s].border);
-      btn.style.background = conf[s].bg; btn.style.color = conf[s].text;
-    } else {
-      btn.classList.add('border-outline-variant/20');
-    }
+    btn.style.background='';btn.style.color='';
+    if(s===status){btn.classList.add(conf[s].border);btn.style.background=conf[s].bg;btn.style.color=conf[s].text;}
+    else btn.classList.add('border-outline-variant/20');
   });
 }
-function setModalStatus(s) { renderModalStatus(s); }
-function closeModal() { document.getElementById('task-modal').classList.add('hidden'); }
-
-async function saveModal() {
-  const title = document.getElementById('modal-field-title').value.trim();
-  if (!title) { alert('제목을 입력해주세요.'); return; }
-  const body = {
-    title, status: modalStatus,
-    due_date:    document.getElementById('modal-field-due_date').value    || null,
-    due_time:    document.getElementById('modal-field-due_time').value    || null,
-    category:    document.getElementById('modal-field-category').value    || null,
-    location:    document.getElementById('modal-field-location').value    || null,
-    attendees:   document.getElementById('modal-field-attendees').value   || null,
-    description: document.getElementById('modal-field-description').value || null,
-    priority:    document.getElementById('modal-field-priority').value,
-  };
-  try {
-    const url    = modalTaskId ? `/tasks/${modalTaskId}` : '/tasks/new';
-    const method = modalTaskId ? 'PATCH' : 'POST';
-    const res    = await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const data   = await res.json();
-    if (data.error) { alert(data.error); return; }
-    closeModal(); await refreshAll();
-  } catch(e) { alert('저장에 실패했습니다.'); }
+function setModalStatus(s){renderModalStatus(s);}
+function closeModal(){document.getElementById('task-modal').classList.add('hidden');}
+async function saveModal(){
+  const title=document.getElementById('modal-field-title').value.trim();
+  if(!title){alert('제목을 입력해주세요.');return;}
+  const body={title,status:modalStatus,due_date:document.getElementById('modal-field-due_date').value||null,due_time:document.getElementById('modal-field-due_time').value||null,category:document.getElementById('modal-field-category').value||null,location:document.getElementById('modal-field-location').value||null,attendees:document.getElementById('modal-field-attendees').value||null,description:document.getElementById('modal-field-description').value||null,priority:document.getElementById('modal-field-priority').value};
+  try{
+    const url=modalTaskId?`/tasks/${modalTaskId}`:'/tasks/new',method=modalTaskId?'PATCH':'POST';
+    const res=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json();if(data.error){alert(data.error);return;}
+    closeModal();await refreshAll();
+  }catch(e){alert('저장에 실패했습니다.');}
 }
-
-async function deleteFromModal() {
-  if (!modalTaskId) return;
-  if (!confirm('이 일정을 삭제할까요?')) return;
-  try {
-    await fetch(`/tasks/${modalTaskId}`,{method:'DELETE'});
-    closeModal(); await refreshAll();
-  } catch(e) { alert('삭제에 실패했습니다.'); }
+async function deleteFromModal(){
+  if(!modalTaskId)return;if(!confirm('이 일정을 삭제할까요?'))return;
+  try{await fetch(`/tasks/${modalTaskId}`,{method:'DELETE'});closeModal();await refreshAll();}
+  catch(e){alert('삭제에 실패했습니다.');}
 }
 
 // ── 채팅 ──────────────────────────────────────────────────────────
-async function loadGreeting() {
+async function loadGreeting(){
   showTyping();
-  try {
-    const res  = await fetch('/greeting');
-    const data = await res.json();
-    removeTyping();
-    appendMessage('assistant', data.response || data.error);
-  } catch {
-    removeTyping();
-    appendMessage('assistant','안녕하세요! 무엇을 도와드릴까요? 😊');
-  }
+  try{const res=await fetch('/greeting');const data=await res.json();removeTyping();appendMessage('assistant',data.response||data.error);}
+  catch{removeTyping();appendMessage('assistant','안녕하세요! 무엇을 도와드릴까요? 😊');}
 }
 
-async function sendMessage() {
-  const input = document.getElementById('input');
-  const msg   = input.value.trim();
-  if (!msg) return;
-  input.value = '';
-  if (activeTab !== 'chat') switchTab('chat');
-  appendMessage('user', msg);
+function getActiveInput(){return document.getElementById(isMobile()?'input':'desk-input');}
+function getActiveSendBtn(){return document.getElementById(isMobile()?'send-btn':'desk-send-btn');}
+function getActiveSendIcon(){return document.getElementById(isMobile()?'send-icon':'desk-send-icon');}
 
-  const btn  = document.getElementById('send-btn');
-  const icon = document.getElementById('send-icon');
-  btn.disabled = true; icon.textContent = 'progress_activity'; icon.classList.add('spin');
+async function sendMessage(){
+  const input=getActiveInput();const msg=input.value.trim();if(!msg)return;
+  input.value='';
+  // 모바일에서만 채팅 탭으로 전환; 데스크탑은 사이드바에 항상 표시
+  if(isMobile()&&activeTab!=='chat')switchTab('chat');
+  appendMessage('user',msg);
+  const btn=getActiveSendBtn(),icon=getActiveSendIcon();
+  btn.disabled=true;icon.textContent='progress_activity';icon.classList.add('spin');
   showTyping();
-
-  try {
-    const prevIds = new Set(allTasks.map(t => t.id));
-    const res  = await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
-    const data = await res.json();
-    removeTyping();
-    appendMessage('assistant', data.response || data.error || '오류가 발생했습니다.');
+  try{
+    const prevIds=new Set(allTasks.map(t=>t.id));
+    const res=await fetch('/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg})});
+    const data=await res.json();removeTyping();
+    appendMessage('assistant',data.response||data.error||'오류가 발생했습니다.');
     await refreshAll();
-
-    const newTasks = allTasks.filter(t => !prevIds.has(t.id) && t.due_date);
-    if (newTasks.length > 0) {
+    const newTasks=allTasks.filter(t=>!prevIds.has(t.id)&&t.due_date);
+    if(newTasks.length>0){
       flashTabBadge();
-      const targetDate = new Date(newTasks[0].due_date+'T12:00:00');
-      weekStart = getMonday(targetDate);
-      selectedWeekDay = newTasks[0].due_date;
-      setTimeout(() => switchTab('week'), 1500);
-    } else if (allTasks.length !== prevIds.size) {
-      flashTabBadge();
+      // 데스크탑에서만 자동으로 주간 뷰 전환 (모바일은 사용자가 직접 이동)
+      if(!isMobile()){const targetDate=new Date(newTasks[0].due_date+'T12:00:00');weekStart=getMonday(targetDate);selectedWeekDay=newTasks[0].due_date;setTimeout(()=>switchTab('week'),1500);}
     }
-  } catch {
-    removeTyping();
-    appendMessage('assistant','네트워크 오류가 발생했습니다.');
-  } finally {
-    btn.disabled = false; icon.textContent = 'arrow_upward'; icon.classList.remove('spin');
-  }
+    else if(allTasks.length!==prevIds.size)flashTabBadge();
+  }catch{removeTyping();appendMessage('assistant','네트워크 오류가 발생했습니다.');}
+  finally{btn.disabled=false;icon.textContent=isMobile()?'arrow_upward':'send';icon.classList.remove('spin');}
 }
 
-function flashTabBadge() {
-  ['today','week','month'].forEach(tab => {
-    const btn = document.getElementById('tab-'+tab);
-    btn.querySelector('.update-badge')?.remove();
-    const dot = document.createElement('span');
-    dot.className = 'update-badge';
-    dot.style.cssText = 'position:absolute;top:2px;right:6px;width:7px;height:7px;border-radius:50%;background:#3b675b;animation:badge-pop .4s ease;';
-    btn.style.position = 'relative';
-    btn.appendChild(dot);
-    setTimeout(() => dot.remove(), 3000);
+function flashTabBadge(){
+  ['today','week','month'].forEach(tab=>{  // chat은 항상 사이드바에 보이므로 제외
+    ['tab-','desk-tab-'].forEach(prefix=>{
+      const btn=document.getElementById(prefix+tab);if(!btn)return;
+      btn.querySelector('.update-badge')?.remove();
+      const dot=document.createElement('span');dot.className='update-badge';
+      dot.style.cssText='position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:#3b675b;animation:badge-pop .4s ease;';
+      btn.style.position='relative';btn.appendChild(dot);setTimeout(()=>dot.remove(),3000);
+    });
   });
 }
 
-function quickSend(text) {
-  if (activeTab !== 'chat') switchTab('chat');
-  document.getElementById('input').value = text;
-  sendMessage();
+function quickSend(text){
+  if(isMobile()){if(activeTab!=='chat')switchTab('chat');}
+  else{openChatSidebar();}
+  getActiveInput().value=text;sendMessage();
 }
 
-function appendMessage(role, text) {
-  const container = document.getElementById('messages');
-  const isUser    = role === 'user';
-  const wrapper   = document.createElement('div');
-  wrapper.className = `flex ${isUser?'justify-end':'justify-start'}`;
-  const bubble = document.createElement('div');
-  bubble.className = isUser
-    ? 'bg-gradient-to-br from-primary to-primary-dim text-on-primary rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%] text-sm shadow-lg shadow-primary/20'
-    : 'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] text-sm shadow-sm border border-outline-variant/10 prose';
-  bubble.innerHTML = formatText(text);
-  wrapper.appendChild(bubble);
-  container.appendChild(wrapper);
-  container.scrollTop = container.scrollHeight;
+function appendMessage(role,text){
+  const container=document.getElementById('messages'),isUser=role==='user';
+  const wrapper=document.createElement('div');wrapper.className=`flex ${isUser?'justify-end':'justify-start'}`;
+  const bubble=document.createElement('div');
+  bubble.className=isUser
+    ?'bg-gradient-to-br from-primary to-primary-dim text-on-primary rounded-2xl rounded-tr-sm px-4 py-3 max-w-xs md:max-w-md text-sm shadow-lg shadow-primary/20'
+    :'bg-surface-container-lowest text-on-surface rounded-2xl rounded-tl-sm px-4 py-3 max-w-xs md:max-w-md text-sm shadow-sm border border-outline-variant/10 prose';
+  bubble.innerHTML=formatText(text);wrapper.appendChild(bubble);container.appendChild(wrapper);container.scrollTop=container.scrollHeight;
 }
-
-function formatText(text) {
-  return text
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/^#{1,3} (.+)$/gm,'<strong>$1</strong>')
-    .replace(/^- (.+)$/gm,'<li>$1</li>')
-    .replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>')
-    .replace(/\n/g,'<br>');
+function formatText(text){
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/^#{1,3} (.+)$/gm,'<strong>$1</strong>')
+    .replace(/^- (.+)$/gm,'<li>$1</li>').replace(/(<li>.*<\/li>)/gs,'<ul>$1</ul>').replace(/\n/g,'<br>');
 }
-
-function showTyping() {
-  const container = document.getElementById('messages');
-  const t = document.createElement('div');
-  t.id = 'typing-indicator'; t.className = 'flex justify-start';
-  t.innerHTML = `<div class="bg-surface-container-lowest rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-outline-variant/10 flex gap-1 items-center">
-    <div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
-  container.appendChild(t);
-  container.scrollTop = container.scrollHeight;
+function showTyping(){
+  const container=document.getElementById('messages');const t=document.createElement('div');
+  t.id='typing-indicator';t.className='flex justify-start';
+  t.innerHTML=`<div class="bg-surface-container-lowest rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-outline-variant/10 flex gap-1 items-center"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
+  container.appendChild(t);container.scrollTop=container.scrollHeight;
 }
-function removeTyping() { document.getElementById('typing-indicator')?.remove(); }
-
-async function clearHistory() {
-  if (!confirm('대화 기록을 초기화할까요?')) return;
-  await fetch('/clear',{method:'POST'});
-  document.getElementById('messages').innerHTML = '';
+function removeTyping(){document.getElementById('typing-indicator')?.remove();}
+async function clearHistory(){
+  if(!confirm('대화 기록을 초기화할까요?'))return;
+  await fetch('/clear',{method:'POST'});document.getElementById('messages').innerHTML='';
   appendMessage('assistant','대화 기록을 초기화했습니다. 다시 시작해볼까요? 😊');
 }
 </script>

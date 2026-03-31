@@ -7,8 +7,27 @@ from ai_agent import AIAssistant
 from database import Database
 
 app = Flask(__name__)
-assistant = AIAssistant()
 db = Database()
+
+# 서버 시작 시점에 API 키가 없어도 웹앱은 구동되도록 지연 초기화합니다.
+assistant = None
+assistant_init_error = None
+
+
+def get_assistant():
+    """AIAssistant 인스턴스를 필요할 때 생성합니다."""
+    global assistant, assistant_init_error
+    if assistant is not None:
+        return assistant
+    if assistant_init_error is not None:
+        raise ValueError(assistant_init_error)
+
+    try:
+        assistant = AIAssistant()
+        return assistant
+    except Exception as e:
+        assistant_init_error = str(e)
+        raise
 
 
 @app.route("/")
@@ -27,7 +46,7 @@ def chat():
         return jsonify({"error": "메시지가 비어있습니다."}), 400
 
     try:
-        response = assistant.chat(user_message)
+        response = get_assistant().chat(user_message)
         return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -118,7 +137,7 @@ def delete_task(task_id):
 def greeting():
     """페이지 로드 시 오늘의 브리핑을 반환합니다."""
     try:
-        response = assistant.get_greeting()
+        response = get_assistant().get_greeting()
         return jsonify({"response": response})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
