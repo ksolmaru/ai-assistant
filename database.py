@@ -49,6 +49,34 @@ class Database:
                     created_at TEXT NOT NULL
                 )
             """)
+
+            # ── 루틴 (Routines) ─────────────────────────────────────────────
+            # 이벤트(Tasks)와 독립적으로 반복 체크할 항목을 저장합니다.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS routines (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title         TEXT    NOT NULL,
+                    frequency     TEXT    NOT NULL,  -- 'daily' | 'weekly' | 'monthly'
+                    days_of_week  TEXT,              -- weekly 전용: JSON 배열 문자열 (예: '[1,3,5]' = 월/수/금)
+                    day_of_month  INTEGER,          -- monthly 전용 (예: 1 = 매월 1일)
+                    category      TEXT,              -- 선택적 카테고리
+                    active        INTEGER DEFAULT 1,-- 1: 활성 / 0: 비활성(삭제)
+                    created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 루틴 체크 기록: routine_id + checked_date 조합에 대해 완료 여부를 저장합니다.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS routine_logs (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    routine_id   INTEGER NOT NULL,
+                    checked_date DATE    NOT NULL, -- YYYY-MM-DD
+                    completed    INTEGER DEFAULT 0,
+                    note          TEXT,
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (routine_id, checked_date)
+                )
+            """)
             conn.commit()
 
     # ── 할 일 (Tasks) ──────────────────────────────────────────────
