@@ -3,7 +3,8 @@ database.py — SQLite 추상화 레이어
 나중에 PostgreSQL 등 클라우드 DB로 교체할 때 이 파일만 수정하면 됩니다.
 """
 import sqlite3
-from datetime import datetime
+import json
+from datetime import datetime, date, timedelta
 
 
 class Database:
@@ -49,6 +50,97 @@ class Database:
                     created_at TEXT NOT NULL
                 )
             """)
+
+            # ── 루틴 (Routines) ─────────────────────────────────────────────
+            # 이벤트(Tasks)와 독립적으로 반복 체크할 항목을 저장합니다.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS routines (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title         TEXT    NOT NULL,
+                    frequency     TEXT    NOT NULL,  -- 'daily' | 'weekly' | 'monthly'
+                    days_of_week  TEXT,              -- weekly 전용: JSON 배열 문자열 (예: '[1,3,5]' = 월/수/금)
+                    day_of_month  INTEGER,          -- monthly 전용 (예: 1 = 매월 1일)
+                    category      TEXT,              -- 선택적 카테고리
+                    active        INTEGER DEFAULT 1,-- 1: 활성 / 0: 비활성(삭제)
+                    created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 루틴 체크 기록: routine_id + checked_date 조합에 대해 완료 여부를 저장합니다.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS routine_logs (
+                    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                    routine_id   INTEGER NOT NULL,
+                    checked_date DATE    NOT NULL, -- YYYY-MM-DD
+                    completed    INTEGER DEFAULT 0,
+                    note          TEXT,
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE (routine_id, checked_date)
+                )
+            """)
+
+            # 루틴 테이블 컬럼 마이그레이션
+            for col in ["interval_days INTEGER", "start_date TEXT", "order_index INTEGER DEFAULT 0"]:
+                try:
+                    conn.execute(f"ALTER TABLE routines ADD COLUMN {col}")
+                except Exception:
+                    pass
+
+            # ── 초기 루틴 예시 데이터 (빈 경우에만 시드) ─────────────────
+            try:
+                cnt_row = conn.execute("SELECT COUNT(*) as cnt FROM routines").fetchone()
+                cnt = int(cnt_row["cnt"]) if cnt_row else 0
+            except Exception:
+                cnt = 0
+
+            if cnt == 0:
+                # 매일 루틴
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("감사 일기 쓰기",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("성경 묵상 / QT",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("물 2L 마시기",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("운동 30분",),
+                )
+
+                # 주간 루틴 (금요일=5, 월요일=1 기준)
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'weekly', '[5]', NULL, NULL, 1)
+                    """,
+                    ("주간 업무 정리 (금)",),
+                )
+
+                # 월간 루틴 (월초=1일)
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'monthly', NULL, 1, NULL, 1)
+                    """,
+                    ("월초 목표 설정",),
+                )
             conn.commit()
 
     # ── 할 일 (Tasks) ──────────────────────────────────────────────
@@ -140,3 +232,256 @@ class Database:
         with self._connect() as conn:
             conn.execute("DELETE FROM conversations")
             conn.commit()
+
+    # ── 루틴 (Routines) ──────────────────────────────────────────────────
+
+    def add_routine(self, title, frequency, days_of_week=None, day_of_month=None,
+                    category=None, active=1, interval_days=None, start_date=None):
+        now = datetime.now().isoformat()
+        with self._connect() as conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO routines
+                    (title, frequency, days_of_week, day_of_month, category, active, created_at, interval_days, start_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (title, frequency, days_of_week, day_of_month, category, active, now, interval_days, start_date),
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_routines(self, active_only=True):
+        query = "SELECT * FROM routines"
+        params: list = []
+        if active_only:
+            query += " WHERE active = 1"
+        query += " ORDER BY COALESCE(order_index, 0) ASC, id ASC"
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
+            return [dict(row) for row in rows]
+
+    def update_routine(self, routine_id, **kwargs):
+        allowed = {"title", "frequency", "days_of_week", "day_of_month", "category", "active", "interval_days", "start_date"}
+        fields = {k: v for k, v in kwargs.items() if k in allowed}
+        if not fields:
+            return False
+
+        set_clause = ", ".join(f"{k} = ?" for k in fields)
+        values = list(fields.values()) + [routine_id]
+
+        with self._connect() as conn:
+            cur = conn.execute(
+                f"UPDATE routines SET {set_clause} WHERE id = ?",
+                values,
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def deactivate_routine(self, routine_id):
+        # 기획서에서는 “삭제(비활성화)”로 되어 있으므로 active=0 처리합니다.
+        with self._connect() as conn:
+            cur = conn.execute("UPDATE routines SET active = 0 WHERE id = ?", (routine_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    def reorder_routines(self, id_list: list):
+        """루틴 순서를 id_list 배열 순서대로 업데이트합니다."""
+        with self._connect() as conn:
+            for idx, routine_id in enumerate(id_list):
+                conn.execute(
+                    "UPDATE routines SET order_index = ? WHERE id = ?",
+                    (idx, int(routine_id)),
+                )
+            conn.commit()
+
+    def delete_routine_permanent(self, routine_id):
+        """루틴을 완전히 삭제합니다 (관련 체크 기록도 함께 삭제)."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM routine_logs WHERE routine_id = ?", (routine_id,))
+            cur = conn.execute("DELETE FROM routines WHERE id = ?", (routine_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    def set_routine_check(self, routine_id, checked_date: str, completed: int, note=None):
+        # UNIQUE (routine_id, checked_date) 때문에 “업데이트 후 없으면 인서트” 패턴을 사용합니다.
+        with self._connect() as conn:
+            updated = conn.execute(
+                """
+                UPDATE routine_logs
+                SET completed = ?, note = ?
+                WHERE routine_id = ? AND checked_date = ?
+                """,
+                (int(completed), note, routine_id, checked_date),
+            ).rowcount
+
+            if updated == 0:
+                conn.execute(
+                    """
+                    INSERT INTO routine_logs (routine_id, checked_date, completed, note)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (routine_id, checked_date, int(completed), note),
+                )
+            conn.commit()
+            return True
+
+    def _parse_days_of_week(self, days_of_week):
+        if not days_of_week:
+            return []
+        try:
+            v = json.loads(days_of_week) if isinstance(days_of_week, str) else days_of_week
+            if isinstance(v, list):
+                return [int(x) for x in v]
+        except Exception:
+            pass
+        return []
+
+    def _day_num_monday_1(self, d: date) -> int:
+        # datetime.date.weekday(): Mon=0..Sun=6  ->  Mon=1..Sun=7 로 변환
+        return int(d.weekday()) + 1
+
+    def _routine_applies_on_date(self, routine: dict, d: date) -> bool:
+        freq = (routine.get("frequency") or "").lower().strip()
+        if freq == "daily":
+            return True
+        if freq == "weekly":
+            allowed = self._parse_days_of_week(routine.get("days_of_week"))
+            return self._day_num_monday_1(d) in allowed
+        if freq == "monthly":
+            dom = routine.get("day_of_month")
+            if dom is None:
+                return False
+            return int(dom) == int(d.day)
+        if freq == "interval":
+            # N일마다 반복: start_date 기준으로 interval_days 간격마다 해당
+            interval = routine.get("interval_days")
+            start = routine.get("start_date")
+            if not interval or not start:
+                return False
+            try:
+                start_date = datetime.strptime(start, "%Y-%m-%d").date()
+                delta = (d - start_date).days
+                return delta >= 0 and delta % int(interval) == 0
+            except Exception:
+                return False
+        return False
+
+    def get_routines_for_date(self, checked_date: str):
+        d = datetime.strptime(checked_date, "%Y-%m-%d").date()
+        routines = self.get_routines(active_only=True)
+        applicable = [r for r in routines if self._routine_applies_on_date(r, d)]
+        routine_ids = [r["id"] for r in applicable]
+        logs_map = {}
+        if routine_ids:
+            placeholders = ", ".join("?" for _ in routine_ids)
+            with self._connect() as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT routine_id, completed
+                    FROM routine_logs
+                    WHERE checked_date = ? AND routine_id IN ({placeholders})
+                    """,
+                    [checked_date] + routine_ids,
+                ).fetchall()
+                logs_map = {(row["routine_id"], checked_date): int(row["completed"]) for row in rows}
+
+        result = []
+        for r in applicable:
+            completed = logs_map.get((r["id"], checked_date), 0)
+            result.append({
+                "id": r["id"],
+                "title": r["title"],
+                "frequency": r["frequency"],
+                "days_of_week": r.get("days_of_week"),
+                "day_of_month": r.get("day_of_month"),
+                "interval_days": r.get("interval_days"),
+                "start_date": r.get("start_date"),
+                "category": r.get("category"),
+                "completed": completed,
+            })
+        return result
+
+    def get_routines_weekly_matrix(self, week_start: str):
+        # week_start: YYYY-MM-DD (월요일로 가정)
+        ws = datetime.strptime(week_start, "%Y-%m-%d").date()
+        week_days = [ws + timedelta(days=i) for i in range(7)]
+        week_day_strs = [d.strftime("%Y-%m-%d") for d in week_days]
+
+        routines = self.get_routines(active_only=True)
+        routine_ids = [r["id"] for r in routines]
+
+        # 해당 주 전체 범위에 대한 로그를 미리 가져옵니다.
+        logs_map: dict[tuple[int, str], int] = {}
+        if routine_ids:
+            placeholders = ", ".join("?" for _ in routine_ids)
+            with self._connect() as conn:
+                rows = conn.execute(
+                    f"""
+                    SELECT routine_id, checked_date, completed
+                    FROM routine_logs
+                    WHERE checked_date IN ({", ".join("?" for _ in week_day_strs)})
+                      AND routine_id IN ({placeholders})
+                    """,
+                    list(week_day_strs) + routine_ids,
+                ).fetchall()
+                for row in rows:
+                    logs_map[(int(row["routine_id"]), row["checked_date"])] = int(row["completed"])
+
+        # 각 루틴: 요일별(0/1/None) + 달성률
+        matrix_rows = []
+        for r in routines:
+            days_status = []
+            total_applicable = 0
+            done_applicable = 0
+            for i, d in enumerate(week_days):
+                ds = d.strftime("%Y-%m-%d")
+                if not self._routine_applies_on_date(r, d):
+                    days_status.append(None)
+                    continue
+                total_applicable += 1
+                completed = logs_map.get((r["id"], ds), 0)
+                if completed == 1:
+                    done_applicable += 1
+                days_status.append(completed)
+            completion_percent = 0
+            if total_applicable > 0:
+                completion_percent = round(done_applicable / total_applicable * 100)
+
+            matrix_rows.append({
+                "id": r["id"],
+                "title": r["title"],
+                "frequency": r["frequency"],
+                "days_of_week": r.get("days_of_week"),
+                "day_of_month": r.get("day_of_month"),
+                "interval_days": r.get("interval_days"),
+                "start_date": r.get("start_date"),
+                "category": r.get("category"),
+                "days": days_status,
+                "completed_days": done_applicable,
+                "total_days": total_applicable,
+                "completion_percent": completion_percent,
+            })
+
+        # 요일별 달성률(우측 컬럼 역할)
+        day_completion_rates: list[int] = []
+        for i, d in enumerate(week_days):
+            ds = d.strftime("%Y-%m-%d")
+            applicable_count = 0
+            done_count = 0
+            for r in routines:
+                if not self._routine_applies_on_date(r, d):
+                    continue
+                applicable_count += 1
+                if logs_map.get((r["id"], ds), 0) == 1:
+                    done_count += 1
+            if applicable_count == 0:
+                day_completion_rates.append(0)
+            else:
+                day_completion_rates.append(round(done_count / applicable_count * 100))
+
+        return {
+            "week_start": week_start,
+            "week_days": week_day_strs,
+            "routines": matrix_rows,
+            "day_completion_rates": day_completion_rates,
+        }

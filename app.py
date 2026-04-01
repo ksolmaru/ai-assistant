@@ -5,9 +5,13 @@ app.py — Flask 웹 서버
 from flask import Flask, request, jsonify, render_template
 from ai_agent import AIAssistant
 from database import Database
+from routines_bp import routines_bp
 
 app = Flask(__name__)
 db = Database()
+
+# 루틴 API를 /api/routines/* 로 노출합니다.
+app.register_blueprint(routines_bp, url_prefix="/api/routines")
 
 # 서버 시작 시점에 API 키가 없어도 웹앱은 구동되도록 지연 초기화합니다.
 assistant = None
