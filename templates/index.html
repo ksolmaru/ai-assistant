@@ -719,6 +719,7 @@ function buildWeekExportHtml(F){
 
 // ── 전역 상태 ──────────────────────────────────────────────────────
 let allTasks     = [];
+let routinesToday = [];
 const now        = new Date();
 const TODAY_STR  = fmtDate(now);
 let activeTab    = 'today';
@@ -788,6 +789,11 @@ async function refreshAll(){
     const res=await fetch('/tasks');
     const data=await res.json();
     allTasks=data.tasks||[];
+    try{
+      const rres=await fetch('/api/routines/today');
+      const rdata=await rres.json();
+      routinesToday=rdata.routines||[];
+    }catch(e){}
     renderToday();renderWeek();renderMonth();
   }catch(e){}
 }
@@ -887,6 +893,41 @@ function taskCard(task){
   </div>`;
 }
 
+function routineCard(r){
+  const done=r.completed===1;
+  const{bg,text}=getCatColors(r.category);
+  const catBadge=r.category?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${bg};color:${text}">${escapeHtml(r.category)}</span>`:'';
+  return`<div class="flex items-start justify-between gap-3 p-3.5 rounded-xl border border-outline-variant/10 bg-surface-container-lowest hover:bg-surface-container transition-colors">
+    <label class="flex items-start gap-3 cursor-pointer flex-1 min-w-0">
+      <input type="checkbox" class="w-5 h-5 accent-primary cursor-pointer mt-0.5 flex-shrink-0" ${done?'checked':''}
+        onchange="toggleRoutineCheck(${r.id}, this.checked)"/>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 flex-wrap mb-1.5">${catBadge}</div>
+        <div class="text-sm font-semibold text-on-surface leading-snug ${done?'line-through text-on-surface-variant':''}">${escapeHtml(r.title)}</div>
+      </div>
+    </label>
+    <span class="material-symbols-outlined text-on-surface-variant/20 flex-shrink-0 ${done?'fill-icon text-primary/50':''}">
+      ${done?'check_circle':'radio_button_unchecked'}
+    </span>
+  </div>`;
+}
+
+async function toggleRoutineCheck(routineId, checked){
+  try{
+    const resp=await fetch('/api/routines/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      routine_id:routineId,
+      date:TODAY_STR,
+      completed:checked?1:0
+    })});
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok) throw new Error(data.error||'루틴 체크 실패');
+
+    const r=routinesToday.find(x=>x.id===routineId);
+    if(r) r.completed=checked?1:0;
+    renderToday();
+  }catch(e){}
+}
+
 // ── 오늘 뷰 ───────────────────────────────────────────────────────
 function renderToday(){
   const base=filterVisible(allTasks);
@@ -894,7 +935,16 @@ function renderToday(){
   const todayT=base.filter(t=>t.due_date===TODAY_STR&&!isActuallyOverdue(t)).sort((a,b)=>(a.due_time||'99:99').localeCompare(b.due_time||'99:99'));
   const noDate=base.filter(t=>!t.due_date&&t.status!=='done');
   const doneList=base.filter(t=>t.status==='done'&&t.due_date&&t.due_date<TODAY_STR);
+  const routines=routinesToday.filter(r=>isCatVisible(r.category));
   let html='';
+
+  if(routines.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-primary mb-3 flex items-center gap-1 uppercase tracking-wide">
+    <span class="material-symbols-outlined text-[14px]">checklist</span> 오늘의 루틴 (${routines.length})
+  </h3><div class="space-y-2">${routines.map(routineCard).join('')}</div></div>`;
+  else html+=`<div class="mb-5"><h3 class="text-xs font-bold text-primary mb-3 flex items-center gap-1 uppercase tracking-wide">
+    <span class="material-symbols-outlined text-[14px]">checklist</span> 오늘의 루틴
+  </h3><p class="text-on-surface-variant/70 text-sm">체크할 루틴이 없습니다.</p></div>`;
+
   if(overdue.length)html+=`<div class="mb-5 bg-error/5 rounded-2xl p-4 border border-error/10"><h3 class="text-xs font-bold text-error mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">warning</span> 지난 할 일 (${overdue.length})</h3><div class="space-y-2">${overdue.map(taskCard).join('')}</div></div>`;
   if(todayT.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-primary mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">today</span> 오늘 (${todayT.length})</h3><div class="space-y-2">${todayT.map(taskCard).join('')}</div></div>`;
   if(noDate.length)html+=`<div class="mb-5"><h3 class="text-xs font-bold text-on-surface-variant mb-3 flex items-center gap-1 uppercase tracking-wide"><span class="material-symbols-outlined text-[14px]">schedule</span> 날짜 미정 (${noDate.length})</h3><div class="space-y-2">${noDate.map(taskCard).join('')}</div></div>`;
