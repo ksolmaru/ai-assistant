@@ -723,6 +723,7 @@ function buildWeekExportHtml(F){
 let allTasks     = [];
 let routinesToday = [];
 let routinesWeekly = null;
+let routineReview = {weekStart:null, text:null, saved:false};
 const now        = new Date();
 const TODAY_STR  = fmtDate(now);
 let activeTab    = 'today';
@@ -1051,8 +1052,72 @@ function renderWeekRoutines(){
     </tr>`;
   });
 
-  html+=`</tbody></table></div></div>`;
+  const currentWeekStart=fmtDate(weekStart);
+  const hasReview=routineReview.weekStart===currentWeekStart && routineReview.text;
+  let reviewHtml='';
+
+  if(hasReview){
+    const reviewTextEsc=escapeHtml(routineReview.text||'');
+    if(routineReview.saved){
+      reviewHtml=`<div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/10">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="material-symbols-outlined text-primary">auto_awesome</span>
+          <h4 class="text-sm font-bold text-on-surface">AI 주간 리뷰</h4>
+          <span class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary">저장됨</span>
+        </div>
+        <div class="whitespace-pre-wrap text-sm text-on-surface">${reviewTextEsc}</div>
+      </div>`;
+    }else{
+      reviewHtml=`<div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/10">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="material-symbols-outlined text-primary">auto_awesome</span>
+          <h4 class="text-sm font-bold text-on-surface">AI 주간 리뷰</h4>
+        </div>
+        <div class="whitespace-pre-wrap text-sm text-on-surface">${reviewTextEsc}</div>
+        <div class="flex items-center justify-end mt-3">
+          <button id="routine-review-btn" onclick="requestRoutineReview(true)" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-primary-fixed/40 text-primary hover:bg-primary-fixed/60 transition-colors">
+            저장하기
+          </button>
+        </div>
+      </div>`;
+    }
+  }else{
+    reviewHtml=`<button id="routine-review-btn" onclick="requestRoutineReview(false)" class="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-br from-primary-fixed/60 to-primary-fixed/40 text-on-primary hover:scale-[1.01] transition-transform shadow-sm shadow-primary/10">
+      <span class="material-symbols-outlined text-[16px]">sparkles</span> 이번 주 AI 리뷰 받기
+    </button>`;
+  }
+
+  html+=`</tbody></table></div><div class="mt-4">${reviewHtml}</div></div>`;
   el.innerHTML=html;
+}
+
+async function requestRoutineReview(save=false){
+  const ws=fmtDate(weekStart);
+  try{
+    const btn=document.getElementById('routine-review-btn');
+    if(btn){btn.disabled=true;btn.textContent=save?'리뷰 저장 중...':'AI 리뷰 생성 중...';}
+
+    const resp=await fetch('/api/routines/review',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({week_start:ws, save})
+    });
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok) throw new Error(data.error||'AI 리뷰 생성 실패');
+
+    routineReview.weekStart=ws;
+    routineReview.text=data.review||'';
+    routineReview.saved=!!save;
+    renderWeekRoutines();
+  }catch(e){
+    routineReview.weekStart=ws;
+    routineReview.text=(e&&e.message)?String(e.message):'AI 리뷰 생성 중 오류가 발생했습니다.';
+    routineReview.saved=false;
+    renderWeekRoutines();
+  }finally{
+    const btn=document.getElementById('routine-review-btn');
+    if(btn){btn.disabled=false;}
+  }
 }
 
 async function refreshRoutinesWeekly(){
