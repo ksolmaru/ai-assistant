@@ -79,6 +79,13 @@ class Database:
                 )
             """)
 
+            # 루틴 테이블 컬럼 마이그레이션
+            for col in ["interval_days INTEGER", "start_date TEXT", "order_index INTEGER DEFAULT 0"]:
+                try:
+                    conn.execute(f"ALTER TABLE routines ADD COLUMN {col}")
+                except Exception:
+                    pass
+
             # ── 초기 루틴 예시 데이터 (빈 경우에만 시드) ─────────────────
             try:
                 cnt_row = conn.execute("SELECT COUNT(*) as cnt FROM routines").fetchone()
@@ -228,16 +235,17 @@ class Database:
 
     # ── 루틴 (Routines) ──────────────────────────────────────────────────
 
-    def add_routine(self, title, frequency, days_of_week=None, day_of_month=None, category=None, active=1):
+    def add_routine(self, title, frequency, days_of_week=None, day_of_month=None,
+                    category=None, active=1, interval_days=None, start_date=None):
         now = datetime.now().isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
                 """
                 INSERT INTO routines
-                    (title, frequency, days_of_week, day_of_month, category, active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (title, frequency, days_of_week, day_of_month, category, active, created_at, interval_days, start_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (title, frequency, days_of_week, day_of_month, category, active, now),
+                (title, frequency, days_of_week, day_of_month, category, active, now, interval_days, start_date),
             )
             conn.commit()
             return cursor.lastrowid
@@ -247,13 +255,13 @@ class Database:
         params: list = []
         if active_only:
             query += " WHERE active = 1"
-        query += " ORDER BY id DESC"
+        query += " ORDER BY COALESCE(order_index, 0) ASC, id ASC"
         with self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
             return [dict(row) for row in rows]
 
     def update_routine(self, routine_id, **kwargs):
-        allowed = {"title", "frequency", "days_of_week", "day_of_month", "category", "active"}
+        allowed = {"title", "frequency", "days_of_week", "day_of_month", "category", "active", "interval_days", "start_date"}
         fields = {k: v for k, v in kwargs.items() if k in allowed}
         if not fields:
             return False
@@ -273,6 +281,24 @@ class Database:
         # 기획서에서는 “삭제(비활성화)”로 되어 있으므로 active=0 처리합니다.
         with self._connect() as conn:
             cur = conn.execute("UPDATE routines SET active = 0 WHERE id = ?", (routine_id,))
+            conn.commit()
+            return cur.rowcount > 0
+
+    def reorder_routines(self, id_list: list):
+        """루틴 순서를 id_list 배열 순서대로 업데이트합니다."""
+        with self._connect() as conn:
+            for idx, routine_id in enumerate(id_list):
+                conn.execute(
+                    "UPDATE routines SET order_index = ? WHERE id = ?",
+                    (idx, int(routine_id)),
+                )
+            conn.commit()
+
+    def delete_routine_permanent(self, routine_id):
+        """루틴을 완전히 삭제합니다 (관련 체크 기록도 함께 삭제)."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM routine_logs WHERE routine_id = ?", (routine_id,))
+            cur = conn.execute("DELETE FROM routines WHERE id = ?", (routine_id,))
             conn.commit()
             return cur.rowcount > 0
 
@@ -326,6 +352,18 @@ class Database:
             if dom is None:
                 return False
             return int(dom) == int(d.day)
+        if freq == "interval":
+            # N일마다 반복: start_date 기준으로 interval_days 간격마다 해당
+            interval = routine.get("interval_days")
+            start = routine.get("start_date")
+            if not interval or not start:
+                return False
+            try:
+                start_date = datetime.strptime(start, "%Y-%m-%d").date()
+                delta = (d - start_date).days
+                return delta >= 0 and delta % int(interval) == 0
+            except Exception:
+                return False
         return False
 
     def get_routines_for_date(self, checked_date: str):
@@ -356,6 +394,8 @@ class Database:
                 "frequency": r["frequency"],
                 "days_of_week": r.get("days_of_week"),
                 "day_of_month": r.get("day_of_month"),
+                "interval_days": r.get("interval_days"),
+                "start_date": r.get("start_date"),
                 "category": r.get("category"),
                 "completed": completed,
             })
@@ -413,6 +453,8 @@ class Database:
                 "frequency": r["frequency"],
                 "days_of_week": r.get("days_of_week"),
                 "day_of_month": r.get("day_of_month"),
+                "interval_days": r.get("interval_days"),
+                "start_date": r.get("start_date"),
                 "category": r.get("category"),
                 "days": days_status,
                 "completed_days": done_applicable,

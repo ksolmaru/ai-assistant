@@ -84,7 +84,10 @@ def check_routine():
 @routines_bp.route("", methods=["GET"])
 def list_routines():
     try:
-        routines = db.get_routines(active_only=True)
+        # active_only=false 쿼리 파라미터로 비활성 루틴도 조회 가능
+        active_only_param = request.args.get("active_only", "true").lower()
+        active_only = active_only_param != "false"
+        routines = db.get_routines(active_only=active_only)
         return jsonify({"routines": routines})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -99,13 +102,15 @@ def create_routine():
             return jsonify({"error": "title is required"}), 400
 
         frequency = (data.get("frequency") or "daily").strip()
-        if frequency not in {"daily", "weekly", "monthly"}:
-            return jsonify({"error": "frequency must be 'daily'|'weekly'|'monthly'"}), 400
+        if frequency not in {"daily", "weekly", "monthly", "interval"}:
+            return jsonify({"error": "frequency must be 'daily'|'weekly'|'monthly'|'interval'"}), 400
 
         days_of_week = data.get("days_of_week")
         day_of_month = data.get("day_of_month")
         category = data.get("category")
         active = int(data.get("active", 1))
+        interval_days = data.get("interval_days")
+        start_date_val = data.get("start_date")
 
         rid = db.add_routine(
             title=title,
@@ -114,6 +119,8 @@ def create_routine():
             day_of_month=day_of_month,
             category=category,
             active=active,
+            interval_days=interval_days,
+            start_date=start_date_val,
         )
         return jsonify({"success": True, "routine_id": rid})
     except Exception as e:
@@ -124,7 +131,7 @@ def create_routine():
 def update_routine(routine_id: int):
     try:
         data = request.get_json() or {}
-        allowed = {"title", "frequency", "days_of_week", "day_of_month", "category", "active"}
+        allowed = {"title", "frequency", "days_of_week", "day_of_month", "category", "active", "interval_days", "start_date"}
         kwargs = {k: v for k, v in data.items() if k in allowed}
         if not kwargs:
             return jsonify({"error": "no update fields"}), 400
@@ -139,9 +146,28 @@ def update_routine(routine_id: int):
 @routines_bp.route("/<int:routine_id>", methods=["DELETE"])
 def delete_routine(routine_id: int):
     try:
-        ok = db.deactivate_routine(routine_id)
+        # force=true 이면 완전 삭제, 아니면 비활성화(소프트 삭제)
+        force = request.args.get("force", "false").lower() == "true"
+        if force:
+            ok = db.delete_routine_permanent(routine_id)
+        else:
+            ok = db.deactivate_routine(routine_id)
         if not ok:
             return jsonify({"error": "routine not found"}), 404
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@routines_bp.route("/reorder", methods=["POST"])
+def reorder_routines():
+    """루틴 목록 순서를 변경합니다. body: {order: [id1, id2, ...]}"""
+    try:
+        data = request.get_json() or {}
+        order = data.get("order", [])
+        if not order:
+            return jsonify({"error": "order list required"}), 400
+        db.reorder_routines(order)
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
