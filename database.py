@@ -78,6 +78,62 @@ class Database:
                     UNIQUE (routine_id, checked_date)
                 )
             """)
+
+            # ── 초기 루틴 예시 데이터 (빈 경우에만 시드) ─────────────────
+            try:
+                cnt_row = conn.execute("SELECT COUNT(*) as cnt FROM routines").fetchone()
+                cnt = int(cnt_row["cnt"]) if cnt_row else 0
+            except Exception:
+                cnt = 0
+
+            if cnt == 0:
+                # 매일 루틴
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("감사 일기 쓰기",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("성경 묵상 / QT",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("물 2L 마시기",),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'daily', NULL, NULL, NULL, 1)
+                    """,
+                    ("운동 30분",),
+                )
+
+                # 주간 루틴 (금요일=5, 월요일=1 기준)
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'weekly', '[5]', NULL, NULL, 1)
+                    """,
+                    ("주간 업무 정리 (금)",),
+                )
+
+                # 월간 루틴 (월초=1일)
+                conn.execute(
+                    """
+                    INSERT INTO routines (title, frequency, days_of_week, day_of_month, category, active)
+                    VALUES (?, 'monthly', NULL, 1, NULL, 1)
+                    """,
+                    ("월초 목표 설정",),
+                )
             conn.commit()
 
     # ── 할 일 (Tasks) ──────────────────────────────────────────────
