@@ -223,6 +223,8 @@
       <div class="md:hidden px-4 mb-4">
         <div id="week-day-pills" class="flex gap-2 overflow-x-auto hide-scrollbar pb-1"></div>
       </div>
+      <!-- Routines weekly matrix -->
+      <div id="week-routines" class="px-4 mb-4 md:px-0"></div>
       <!-- Content (desktop: 7-col grid, mobile: selected day list) -->
       <div id="week-content" class="px-4 pb-4 md:px-0 md:pb-0 md:max-w-5xl"></div>
     </div>
@@ -720,6 +722,7 @@ function buildWeekExportHtml(F){
 // ── 전역 상태 ──────────────────────────────────────────────────────
 let allTasks     = [];
 let routinesToday = [];
+let routinesWeekly = null;
 const now        = new Date();
 const TODAY_STR  = fmtDate(now);
 let activeTab    = 'today';
@@ -794,6 +797,13 @@ async function refreshAll(){
       const rdata=await rres.json();
       routinesToday=rdata.routines||[];
     }catch(e){}
+    if(activeTab==='week'){
+      try{
+        const wres=await fetch(`/api/routines/weekly?week_start=${encodeURIComponent(fmtDate(weekStart))}`);
+        const wdata=await wres.json();
+        routinesWeekly=wdata;
+      }catch(e){}
+    }
     renderToday();renderWeek();renderMonth();
   }catch(e){}
 }
@@ -925,6 +935,7 @@ async function toggleRoutineCheck(routineId, checked){
     const r=routinesToday.find(x=>x.id===routineId);
     if(r) r.completed=checked?1:0;
     renderToday();
+    if(activeTab==='week')refreshRoutinesWeekly();
   }catch(e){}
 }
 
@@ -955,8 +966,106 @@ function renderToday(){
 }
 
 // ── 주간 뷰 ───────────────────────────────────────────────────────
-function prevWeek(){weekStart=addDays(weekStart,-7);renderWeek();}
-function nextWeek(){weekStart=addDays(weekStart, 7);renderWeek();}
+function renderWeekRoutines(){
+  const el=document.getElementById('week-routines');
+  if(!el)return;
+
+  const matrix=routinesWeekly;
+  if(!matrix || !matrix.week_days){
+    el.innerHTML=`<div class="text-on-surface-variant text-sm">루틴 로딩 중...</div>`;
+    return;
+  }
+
+  const weekDays=matrix.week_days||[];
+  const DN=['월','화','수','목','금','토','일'];
+  const routines=(matrix.routines||[]).filter(r=>isCatVisible(r.category));
+
+  if(!routines.length){
+    el.innerHTML=`<div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/10">
+      <h3 class="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1 mb-2">
+        <span class="material-symbols-outlined text-[14px]">checklist</span> 주간 루틴 현황
+      </h3>
+      <p class="text-on-surface-variant/70 text-sm">표시할 루틴이 없습니다.</p>
+    </div>`;
+    return;
+  }
+
+  const dayRates=[];
+  for(let i=0;i<7;i++){
+    const applicable=routines.filter(r=>r.days&&r.days[i]!==null&&r.days[i]!==undefined);
+    const total=applicable.length;
+    const done=applicable.filter(r=>r.days[i]===1).length;
+    dayRates.push(total?Math.round(done/total*100):0);
+  }
+
+  let html=`<div class="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/10">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <h3 class="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1">
+        <span class="material-symbols-outlined text-[14px]">view_week</span> 주간 루틴 현황
+      </h3>
+      <div class="text-[10px] font-bold text-on-surface-variant/70">${weekDays[0]} ~ ${weekDays[6]}</div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-[720px] w-full border-collapse">
+        <thead>
+          <tr>
+            <th class="text-left text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 py-2 pr-2">루틴</th>
+            ${DN.map((d,i)=>`<th class="text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 py-2">
+              ${d}<div class="text-[10px] font-extrabold text-primary/70">${dayRates[i]}%</div>
+            </th>`).join('')}
+            <th class="text-right text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 py-2 pl-2">달성률</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+
+  routines.forEach(r=>{
+    let done=0,total=0;
+    const{bg,text}=getCatColors(r.category);
+    const catBadge=r.category?`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${bg};color:${text}">${escapeHtml(r.category)}</span>`:'';
+
+    const cells=(r.days||[]).map((v,i)=>{
+      if(v===null||v===undefined){
+        return `<td class="text-center py-1.5"><span class="text-on-surface-variant/30 text-sm font-bold">—</span></td>`;
+      }
+      if(v===1){
+        done++; total++;
+        return `<td class="text-center py-1.5"><span class="material-symbols-outlined text-primary/80" style="font-size:18px;">check_circle</span></td>`;
+      }
+      total++;
+      return `<td class="text-center py-1.5"><span class="material-symbols-outlined text-on-surface-variant/40" style="font-size:18px;">radio_button_unchecked</span></td>`;
+    }).join('');
+    const pct=total?Math.round(done/total*100):0;
+
+    html+=`<tr class="border-t border-outline-variant/10">
+      <td class="py-2 pr-2">
+        <div class="min-w-[160px]">
+          <div class="flex items-center gap-2 flex-wrap mb-1.5">${catBadge}</div>
+          <div class="text-sm font-semibold text-on-surface leading-snug">${escapeHtml(r.title)}</div>
+        </div>
+      </td>
+      ${cells}
+      <td class="py-2 pl-2 text-right">
+        <span class="text-sm font-bold ${pct>=80?'text-primary':''}">${pct}%</span>
+      </td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table></div></div>`;
+  el.innerHTML=html;
+}
+
+async function refreshRoutinesWeekly(){
+  try{
+    const wres=await fetch(`/api/routines/weekly?week_start=${encodeURIComponent(fmtDate(weekStart))}`);
+    const wdata=await wres.json();
+    routinesWeekly=wdata;
+    if(activeTab==='week')renderWeek();
+  }catch(e){}
+}
+
+function prevWeek(){weekStart=addDays(weekStart,-7);refreshRoutinesWeekly();renderWeek();}
+function nextWeek(){weekStart=addDays(weekStart, 7);refreshRoutinesWeekly();renderWeek();}
 
 function renderWeek(){
   const days=Array.from({length:7},(_,i)=>addDays(weekStart,i));
@@ -970,6 +1079,8 @@ function renderWeek(){
     od.classList.remove('hidden');
     document.getElementById('week-overdue-list').innerHTML=overdue.map(t=>`<div class="flex items-center gap-2 text-xs cursor-pointer hover:opacity-70" onclick="openTask(${t.id})"><span class="text-error">•</span><span class="text-on-surface">${escapeHtml(t.title)}</span><span class="text-error/60 ml-auto">${t.due_date}</span></div>`).join('');
   }else od.classList.add('hidden');
+
+  renderWeekRoutines();
 
   if(isMobile()){
     // Day pills
