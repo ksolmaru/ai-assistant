@@ -140,10 +140,12 @@ class AIAssistant:
             return "API 키가 올바르지 않습니다. .env 파일의 ANTHROPIC_API_KEY를 확인해주세요."
         except RateLimitError:
             return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
-        except APIConnectionError:
-            return "인터넷 연결을 확인해주세요. Anthropic 서버에 연결할 수 없습니다."
         except APIStatusError as e:
+            if e.status_code == 529:
+                return "Anthropic 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
             return f"API 오류가 발생했습니다 (상태 코드: {e.status_code}). 잠시 후 다시 시도해주세요."
+        except APIConnectionError:
+            return "Anthropic 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
         except Exception as e:
             return f"처리 중 예상치 못한 오류가 발생했습니다: {str(e)}"
 
@@ -214,10 +216,12 @@ class AIAssistant:
             return "API 키가 올바르지 않습니다. .env 파일의 ANTHROPIC_API_KEY를 확인해주세요."
         except RateLimitError:
             return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
-        except APIConnectionError:
-            return "인터넷 연결을 확인해주세요. Anthropic 서버에 연결할 수 없습니다."
         except APIStatusError as e:
+            if e.status_code == 529:
+                return "Anthropic 서버가 일시적으로 과부하 상태입니다. 잠시 후 다시 시도해주세요."
             return f"API 오류가 발생했습니다 (상태 코드: {e.status_code}). 잠시 후 다시 시도해주세요."
+        except APIConnectionError:
+            return "Anthropic 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
         except Exception as e:
             return f"루틴 리뷰 생성 중 예상치 못한 오류가 발생했습니다: {str(e)}"
 
