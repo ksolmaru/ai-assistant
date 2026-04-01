@@ -67,6 +67,63 @@ def get_upcoming_reminders(days_ahead=1):
     }
 
 
+# ── 루틴 (Routines) ─────────────────────────────────────────────────
+
+def add_routine(title, frequency, days_of_week=None, day_of_month=None, category=None, active=1):
+    routine_id = db.add_routine(
+        title=title,
+        frequency=frequency,
+        days_of_week=days_of_week,
+        day_of_month=day_of_month,
+        category=category,
+        active=active,
+    )
+    return {"success": True, "routine_id": routine_id, "message": f"'{title}' 루틴이 추가되었습니다. (ID: {routine_id})"}
+
+
+def update_routine(routine_id, title=None, frequency=None, days_of_week=None, day_of_month=None, category=None, active=None):
+    kwargs = {k: v for k, v in locals().items()
+              if k in {"title", "frequency", "days_of_week", "day_of_month", "category", "active"} and v is not None}
+    if not kwargs:
+        return {"success": False, "message": "수정할 값이 없습니다."}
+    ok = db.update_routine(routine_id, **kwargs)
+    return {"success": bool(ok), "message": "루틴을 수정했습니다." if ok else "해당 루틴을 찾을 수 없습니다."}
+
+
+def deactivate_routine(routine_id):
+    ok = db.deactivate_routine(routine_id)
+    return {"success": bool(ok), "message": "루틴을 비활성화했습니다." if ok else "해당 루틴을 찾을 수 없습니다."}
+
+
+def get_routines(active_only=True):
+    routines = db.get_routines(active_only=active_only)
+    return {"routines": routines, "count": len(routines)}
+
+
+def get_routines_today(date=None):
+    checked_date = date or datetime.now().strftime("%Y-%m-%d")
+    routines = db.get_routines_for_date(checked_date)
+    return {"date": checked_date, "routines": routines, "count": len(routines)}
+
+
+def get_routines_weekly(week_start=None):
+    if not week_start:
+        today = datetime.now().date()
+        week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+    matrix = db.get_routines_weekly_matrix(week_start)
+    return matrix
+
+
+def check_routine(routine_id, date, completed, note=None):
+    db.set_routine_check(
+        routine_id=int(routine_id),
+        checked_date=date,
+        completed=int(completed),
+        note=note,
+    )
+    return {"success": True}
+
+
 # ── 함수 실행 라우터 ──────────────────────────────────────────────
 
 TOOL_FUNCTIONS = {
@@ -76,6 +133,15 @@ TOOL_FUNCTIONS = {
     "complete_task": complete_task,
     "delete_task": delete_task,
     "get_upcoming_reminders": get_upcoming_reminders,
+
+    # routines
+    "add_routine": add_routine,
+    "update_routine": update_routine,
+    "deactivate_routine": deactivate_routine,
+    "get_routines": get_routines,
+    "get_routines_today": get_routines_today,
+    "get_routines_weekly": get_routines_weekly,
+    "check_routine": check_routine,
 }
 
 
@@ -235,6 +301,97 @@ TOOL_SCHEMAS = [
                 }
             },
             "required": []
+        }
+    },
+    {
+        "name": "add_routine",
+        "description": "새로운 루틴을 추가합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "루틴 이름"},
+                "frequency": {"type": "string", "enum": ["daily", "weekly", "monthly"], "description": "반복 주기"},
+                "days_of_week": {"type": "string", "description": "weekly 전용. JSON 배열 문자열 예: '[1,3,5]' (월/수/금)"},
+                "day_of_month": {"type": "integer", "description": "monthly 전용. 매월 1일이면 1"},
+                "category": {"type": "string", "description": "선택적 카테고리"},
+                "active": {"type": "integer", "enum": [0, 1], "description": "1이면 활성"}
+            },
+            "required": ["title", "frequency"]
+        }
+    },
+    {
+        "name": "update_routine",
+        "description": "기존 루틴을 수정합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "routine_id": {"type": "integer", "description": "수정할 루틴 ID"},
+                "title": {"type": "string"},
+                "frequency": {"type": "string", "enum": ["daily", "weekly", "monthly"]},
+                "days_of_week": {"type": "string"},
+                "day_of_month": {"type": "integer"},
+                "category": {"type": "string"},
+                "active": {"type": "integer", "enum": [0, 1]}
+            },
+            "required": ["routine_id"]
+        }
+    },
+    {
+        "name": "deactivate_routine",
+        "description": "루틴을 비활성화(삭제)합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "routine_id": {"type": "integer", "description": "루틴 ID"}
+            },
+            "required": ["routine_id"]
+        }
+    },
+    {
+        "name": "get_routines",
+        "description": "루틴 목록을 조회합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "active_only": {"type": "boolean", "description": "활성 루틴만 조회할지"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_routines_today",
+        "description": "특정 날짜에 해당하는 루틴 목록(체크 상태 포함)을 조회합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "YYYY-MM-DD (없으면 오늘)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "get_routines_weekly",
+        "description": "특정 주(월~일)의 루틴 매트릭스를 조회합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "week_start": {"type": "string", "description": "YYYY-MM-DD (월요일) (없으면 이번 주 월요일)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "check_routine",
+        "description": "루틴을 체크/해제(완료 여부 업데이트)합니다.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "routine_id": {"type": "integer", "description": "루틴 ID"},
+                "date": {"type": "string", "description": "YYYY-MM-DD"},
+                "completed": {"type": "integer", "enum": [0, 1], "description": "1이면 완료, 0이면 미완료"},
+                "note": {"type": "string", "description": "선택 메모"}
+            },
+            "required": ["routine_id", "date", "completed"]
         }
     }
 ]
